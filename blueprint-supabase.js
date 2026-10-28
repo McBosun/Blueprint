@@ -5,6 +5,7 @@
   const sb = supabase.createClient(C.url, C.key);
   let me = (await sb.auth.getSession()).data.session?.user || null;
   sb.auth.onAuthStateChange((_e, s) => { me = s?.user || null; });
+  window.BP = { sb, get me() { return me; }, openAuth: () => $('#au').classList.add('on'), load: () => load() };
 
   // Sign in sheet
   document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='au'><div><h2>Welcome to Blueprint</h2><input id='ae' type='email' placeholder='Email'><input id='ap' type='password' placeholder='Password (6+ characters)'><div class='msg' id='am'></div><button class='btn' id='asi'>Sign in</button><button class='btn alt' id='asu'>Create account</button><button class='btn alt' id='ax'>Close</button></div></div>");

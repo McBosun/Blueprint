@@ -60,6 +60,15 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 #cc{text-align:center;font-size:14px;min-height:20px;text-shadow:0 1px 3px #000;margin-bottom:6px}
 #lchat{font-size:13px;margin-bottom:8px;text-shadow:0 1px 3px #000}
 .live #ltitle{background:rgba(255,255,255,.15);color:#fff;border:0;margin:8px 0}
+.cover{height:110px;background:linear-gradient(135deg,#1e6bff,#0a2a8a)}
+.av{width:84px;height:84px;border-radius:50%;border:4px solid var(--bg);background:var(--blue);object-fit:cover;margin:-42px 16px 0;position:relative;display:block}
+.pn{padding:6px 16px}.pn h2{margin:0;font-size:20px}.pn .un{color:var(--mut);font-size:13px}.pn p{margin:8px 0;font-size:14px;line-height:1.4}
+.st{display:flex;gap:6px;padding:4px 16px}.st div{flex:1;text-align:center;background:var(--card);border-radius:12px;padding:8px 0}.st b{display:block;font-size:17px}.st span{font-size:11px;color:var(--mut)}
+.pb{display:flex;gap:8px;padding:10px 16px}.pb .btn{margin:0}
+.ptabs{display:flex;border-bottom:1px solid var(--line)}.ptabs button{flex:1;background:none;border:0;color:var(--mut);padding:10px;font-size:13px;cursor:pointer}.ptabs .on{color:var(--fg);font-weight:700;border-bottom:2px solid var(--blue)}
+.pg{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px}.pg>div{aspect-ratio:3/4;position:relative;overflow:hidden;color:#fff;font-size:11px;padding:6px;display:flex;align-items:flex-end;cursor:pointer}
+.pill{display:inline-block;background:var(--card);border-radius:99px;padding:3px 10px;font-size:12px;margin:0 4px 4px 0;color:var(--blue)}
+.sheet label{font-size:12px;color:var(--mut);display:block;margin-top:6px}
 </style>
 </head>
 <body>
@@ -74,13 +83,12 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 <section class="view on" id="feed"></section>
 <section class="view" id="explore"><div class="pad" style="padding-bottom:0"><input id="q" placeholder="Search videos, lives, guides"></div><div class="grid" id="grid"></div></section>
 <section class="view" id="saved"><div class="pad"><h2>Your Blueprints</h2><div id="savedList"></div></div></section>
-<section class="view" id="me"><div class="pad">
-<svg width="72" height="72"><use href="#logo"/></svg><h2>Your profile</h2>
-<div class="card">Video only. Post up to <b>20 minutes</b>, go live, and share step-by-step Blueprints.</div>
+<section class="view" id="me"><div id="pf"></div>
+<div class="pad"><h2>Settings</h2>
 <div class="row"><span>Break reminders (every 20 min)</span><input type="checkbox" id="brk" checked style="width:auto"></div>
 <div class="row"><span>Family-safe mode</span><input type="checkbox" id="fam" style="width:auto"></div>
 <div class="row"><span>Time spent this session</span><b id="tm">0 min</b></div>
-</div></section>
+<div class="row" id="outrow" hidden><span>Account</span><button class="btn alt" id="so" style="width:auto;margin:0">Sign out</button></div></div></section>
 </main>
 <nav><button data-v="feed" class="on">Home</button><button data-v="explore">Explore</button><button class="plus" id="plus">+</button><button data-v="saved">Blueprints</button><button data-v="me">Me</button></nav>
 </div>
@@ -275,5 +283,6 @@ renderFeed();
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="blueprint-supabase.js"></script>
+<script src="blueprint-profile.js"></script>
 </body>
 </html>
