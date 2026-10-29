@@ -181,3 +181,75 @@ create trigger bp_notify_view_t after insert on public.bp_profile_views for each
 
 -- Instant notifications
 do $$ begin alter publication supabase_realtime add table public.bp_notifications; exception when others then null; end $$;
+
+-- 10. Private messages
+alter table public.bp_profiles add column if not exists dm_policy text not null default 'mutual' check (dm_policy in ('mutual','anyone'));
+
+create table if not exists public.bp_messages (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  recipient_id uuid not null references public.bp_profiles(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 1000),
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  check (sender_id <> recipient_id)
+);
+create index if not exists bp_msg_recipient_idx on public.bp_messages (recipient_id, created_at desc);
+create index if not exists bp_msg_sender_idx on public.bp_messages (sender_id, created_at desc);
+
+create table if not exists public.bp_blocks (
+  blocker_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  blocked_id uuid not null references public.bp_profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_id),
+  check (blocker_id <> blocked_id)
+);
+
+create table if not exists public.bp_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  reported_id uuid not null references public.bp_profiles(id) on delete cascade,
+  reason text not null check (char_length(reason) between 1 and 300),
+  created_at timestamptz not null default now()
+);
+
+-- Who may message whom: not blocked, and (they allow anyone, or you follow each other, or they wrote to you first)
+create or replace function public.bp_can_message(s uuid, r uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select s = (select auth.uid()) and s <> r
+    and not exists (select 1 from public.bp_blocks b where (b.blocker_id = r and b.blocked_id = s) or (b.blocker_id = s and b.blocked_id = r))
+    and exists (select 1 from public.bp_profiles p where p.id = r and (
+      p.dm_policy = 'anyone'
+      or (exists (select 1 from public.bp_follows f where f.follower_id = s and f.following_id = r)
+          and exists (select 1 from public.bp_follows f where f.follower_id = r and f.following_id = s))
+      or exists (select 1 from public.bp_messages m where m.sender_id = r and m.recipient_id = s)));
+$$;
+
+alter table public.bp_messages enable row level security;
+alter table public.bp_blocks enable row level security;
+alter table public.bp_reports enable row level security;
+
+drop policy if exists "msgs read own" on public.bp_messages;
+drop policy if exists "msgs send" on public.bp_messages;
+drop policy if exists "msgs mark read" on public.bp_messages;
+create policy "msgs read own" on public.bp_messages for select to authenticated
+  using (sender_id = (select auth.uid()) or recipient_id = (select auth.uid()));
+create policy "msgs send" on public.bp_messages for insert to authenticated
+  with check (sender_id = (select auth.uid()) and public.bp_can_message(sender_id, recipient_id));
+create policy "msgs mark read" on public.bp_messages for update to authenticated
+  using (recipient_id = (select auth.uid()));
+-- people can only change read_at, never the text
+revoke update on public.bp_messages from authenticated, anon;
+grant update (read_at) on public.bp_messages to authenticated;
+
+drop policy if exists "blocks read own" on public.bp_blocks;
+drop policy if exists "blocks add own" on public.bp_blocks;
+drop policy if exists "blocks remove own" on public.bp_blocks;
+create policy "blocks read own" on public.bp_blocks for select to authenticated using (blocker_id = (select auth.uid()));
+create policy "blocks add own" on public.bp_blocks for insert to authenticated with check (blocker_id = (select auth.uid()));
+create policy "blocks remove own" on public.bp_blocks for delete to authenticated using (blocker_id = (select auth.uid()));
+
+drop policy if exists "reports add own" on public.bp_reports;
+create policy "reports add own" on public.bp_reports for insert to authenticated with check (reporter_id = (select auth.uid()));
+
+do $$ begin alter publication supabase_realtime add table public.bp_messages; exception when others then null; end $$;

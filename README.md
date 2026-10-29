@@ -10,7 +10,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 5. Deploy the folder to GitHub Pages. Authentication > URL Configuration: set Site URL to your Pages link.
 
 ## Files
-index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, config.js, schema.sql, update-all.sql
+index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, config.js, schema.sql, update-all.sql
 
 ## If a video won't post
 - The error shows at the top of the page. Free Supabase plans allow 50 MB per file.
@@ -21,3 +21,4 @@ index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, con
 - Live streams use WebRTC straight from the host's phone to viewers (about 8 at once by default; `maxViewers` in config.js). Some mobile networks block direct connections. For big audiences add a TURN server (`iceServers` in config.js) or use LiveKit, Agora or Mux.
 - Live replays upload to storage when they fit the file limit (50 MB on the free plan).
 - The AI copilot only works inside claude.ai. Elsewhere, use a Supabase Edge Function.
+- Private messages are protected by database rules (only the two people can read them) but are not end-to-end encrypted. Reports are stored in the `bp_reports` table; review them in Supabase > Table Editor.

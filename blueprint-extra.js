@@ -86,12 +86,13 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
 <div style='font-size:12px;color:var(--mut)'>${esc(p.location || '')}${p.location && p.link ? ' · ' : ''}${p.link ? `<a href='${esc(p.link)}' target='_blank' rel='noopener noreferrer' style='color:var(--blue)'>${esc(p.link.replace(/^https?:\/\//, ''))}</a>` : ''}</div>
 <div style='margin-top:8px'>${(p.interests || []).map(t => `<span class='pill'>#${esc(t)}</span>`).join('')}</div></div>
 <div class='st'><div><b>${posts.length}</b><span>Posts</span></div><div><b>${fc}</b><span>Followers</span></div><div><b>${f2.count || 0}</b><span>Following</span></div><div><b>${n(likes)}</b><span>Likes</span></div></div>
-<div class='pb'><button class='btn${following ? ' alt' : ''}' id='opf'>${following ? 'Following ✓' : 'Follow'}</button></div>
+<div class='pb'><button class='btn${following ? ' alt' : ''}' id='opf'>${following ? 'Following ✓' : 'Follow'}</button><button class='btn alt' id='opm'>Message</button></div>
 <div class='pg'>${posts.map(tile).join('') || "<p class='pad' style='grid-column:1/-1;color:var(--mut)'>No posts yet.</p>"}</div>`;
     };
     draw();
     op.onclick = async e => {
       if (e.target.id === 'opx') return close();
+      if (e.target.id === 'opm') { if (!me()) return BP.openAuth(); close(); return window.BPDM && window.BPDM.open(uid, p.username); }
       if (e.target.id === 'opf') {
         if (!me()) return BP.openAuth();
         const r = following ? await sb.from('bp_follows').delete().match({ follower_id: me().id, following_id: uid }) : await sb.from('bp_follows').insert({ following_id: uid });
@@ -103,6 +104,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     };
   }
 
+  BP.openProfile = openProfile;
   // ---------- Search across real posts and people ----------
   let qt, found = [];
   const q0 = $('#q').oninput;
