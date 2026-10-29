@@ -44,7 +44,7 @@
 <div><div id='vs' style='text-align:center;text-shadow:0 1px 3px #000;margin-bottom:6px'></div><div id='vch' style='font-size:13px;margin-bottom:8px;text-shadow:0 1px 3px #000'></div>
 <div style='display:flex;gap:6px'><input id='vi' maxlength='200' placeholder='Say something kind' style='margin:0'><button id='vsd'>Send</button></div></div></div></div>
 <div class='sheet' id='nt'><div><h2>Activity</h2><div style='display:flex;gap:8px'><button class='btn' id='n1'>Notifications</button><button class='btn alt' id='n2'>Profile views</button></div><div id='nl'></div><button class='btn alt' id='ncl'>Close</button></div></div>
-<div class='sheet' id='rp'><div><h2>Replay not uploaded</h2><p id='rpm' style='font-size:14px'></p><a id='rpa' class='btn' style='display:block;text-align:center;text-decoration:none' download='blueprint-replay.webm'>Download replay</a><button class='btn alt' id='rpx'>Close</button></div></div>`);
+<div class='sheet' id='rp'><div><h2 id='rph'>Live replay</h2><p id='rpm' style='font-size:14px'></p><a id='rpa' class='btn' style='display:block;text-align:center;text-decoration:none' download='blueprint-replay.webm'>Download replay</a><button class='btn alt' id='rpx'>Close</button></div></div>`);
   $('#rpx').onclick = () => $('#rp').classList.remove('on');
 
   // ---------- Delete your own posts ----------
@@ -193,9 +193,10 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
   };
   async function saveReplay(blob, title, dur) {
     const mb = blob.size / 1048576;
+    $('#rpa').href = URL.createObjectURL(blob); $('#rpa').download = 'blueprint-live-replay.' + ((blob.type || '').includes('mp4') ? 'mp4' : 'webm');
     if (mb > MAXMB) {
       $('#rpm').textContent = `Your replay is ${mb.toFixed(0)} MB, over the ${MAXMB} MB storage limit, so it wasn’t saved to your profile. Download it now, or raise the limit with a paid Supabase plan.`;
-      $('#rpa').href = URL.createObjectURL(blob); $('#rp').classList.add('on'); return;
+      $('#rph').textContent = 'Replay not uploaded'; $('#rp').classList.add('on'); return;
     }
     BP.note('Saving your live replay…', true);
     const type = (blob.type || 'video/webm').split(';')[0], path = me().id + '/' + Date.now() + '-live-replay.' + (type.includes('mp4') ? 'mp4' : 'webm');
@@ -204,6 +205,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     const r = await sb.from('bp_videos').insert({ title, kind: 'video', video_path: path, duration_s: Math.min(7200, Math.max(1, dur)), is_live_replay: true, tags: ['live', 'replay'] });
     if (r.error) { sb.storage.from('videos').remove([path]); return BP.note('Replay not saved: ' + r.error.message); }
     BP.note('Replay saved to your profile.', true); BP.load();
+    $('#rph').textContent = 'Replay saved'; $('#rpm').textContent = 'Your live replay is on your profile. Want a copy on your phone too?'; $('#rp').classList.add('on');
   }
 
   // ---------- Live: viewer ----------

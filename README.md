@@ -12,7 +12,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 7. Fill in the [brackets] in `terms.html` and `privacy.html` and have a lawyer review them.
 
 ## Files
-index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
+index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
 
 ## Optional config.js settings
 ```js

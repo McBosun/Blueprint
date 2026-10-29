@@ -44,7 +44,7 @@
     return rows.map((v, i) => {
       const tag = [...(v.tags || []), ...(v.is_live_replay ? ['live'] : [])];
       const post = { id: v.id, uid: v.user_id, u: '@' + (nm[v.user_id] || 'user'), t: v.title, tag: tag.length ? tag : ['new'], d: v.duration_s,
-        l: (L[v.id] || 0) - (liked.has(v.id) ? 1 : 0), c: Array(K[v.id] || 0).fill(['@viewer', 'Comment']), g: i % 5, steps: v.steps };
+        l: (L[v.id] || 0) - (liked.has(v.id) ? 1 : 0), c: Array(K[v.id] || 0).fill(['@viewer', 'Comment']), g: i % 5, steps: v.steps, dl: v.allow_download !== false };
       if (v.kind === 'photo') {
         post.imgs = (v.image_paths || []).map(x => pub('media', x));
         if (v.music_path) { post.music = pub('media', v.music_path); post.mt = v.music_title || 'Music'; }
@@ -147,6 +147,7 @@
   $('#up h2').insertAdjacentHTML('afterend', "<div style='display:flex;gap:8px'><button class='btn' id='m1'>Video</button><button class='btn alt' id='m2'>Photos + music</button></div>");
   $('#file').insertAdjacentHTML('afterend', "<div id='pp' hidden><input type='file' id='pimg' accept='image/*' multiple><input type='file' id='pmus' accept='audio/*'><div style='font-size:12px;color:var(--mut)'>Pick 1 to 10 photos, then optional music from your phone (max 15 MB). Only use music you have the right to share.</div></div>");
   $('#umsg').insertAdjacentHTML('afterend', `<div id='mx' style='font-size:12px;color:var(--mut)'>Maximum video size: ${MAXMB} MB.</div>`);
+  $('#ud').insertAdjacentHTML('afterend', "<label style='font-size:13px;display:flex;gap:8px;align-items:center;margin:6px 0'><input type='checkbox' id='adl' checked style='width:auto;margin:0'> Let others download this post</label>");
   let mode = 'video', busy = false;
   const setMode = k => {
     mode = k; $('#m1').className = 'btn' + (k === 'video' ? '' : ' alt'); $('#m2').className = 'btn' + (k === 'photo' ? '' : ' alt');
@@ -174,7 +175,7 @@
   }
   const meta = () => {
     const d = $('#ud').value, steps = d.split('\n').filter(x => /^\d+[.)]/.test(x.trim())).map(x => x.replace(/^\d+[.)]\s*/, ''));
-    return { title: $('#ut').value.trim() || 'Untitled', caption: d, tags: (d.match(/#\w+/g) || []).map(x => x.slice(1)), steps: steps.length ? steps : null };
+    return { title: $('#ut').value.trim() || 'Untitled', caption: d, tags: (d.match(/#\w+/g) || []).map(x => x.slice(1)), steps: steps.length ? steps : null, allow_download: $('#adl') ? $('#adl').checked : true };
   };
   const finish = async () => {
     pending = null; ['#file', '#pimg', '#pmus'].forEach(i => { $(i).value = ''; }); $('#ut').value = ''; $('#ud').value = ''; $('#umsg').textContent = '';

@@ -142,7 +142,7 @@ function renderFeed(){
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
- <button data-a="sh">${ic.s}<span>Share</span></button>${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}</div>
+ <button data-a="sh">${ic.s}<span>Share</span></button>${p.src||p.imgs?(p.dl===false&&!(window.BP&&window.BP.me&&window.BP.me.id===p.uid)?"":`<button data-a="dl">⬇<span>Download</span></button>`):""}${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}</div>
  <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3><p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
@@ -297,5 +297,6 @@ renderFeed();
 <script src="blueprint-upload.js"></script>
 <script src="blueprint-feed.js"></script>
 <script src="blueprint-safety.js"></script>
+<script src="blueprint-settings.js"></script>
 </body>
 </html>

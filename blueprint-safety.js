@@ -33,12 +33,12 @@
 
   // ---------- Settings rows ----------
   $('#outrow').insertAdjacentHTML('beforebegin', `<div class='row'><span>Legal</span><span><a href='terms.html' target='_blank' style='color:var(--blue)'>Terms and rules</a> · <a href='privacy.html' target='_blank' style='color:var(--blue)'>Privacy</a></span></div>
-<div class='row'><span>Check that everything works</span><button class='btn alt' id='hcb' style='width:auto;margin:0'>Run check</button></div>
+<div class='row' id='hcrow' hidden><span>Check that everything works</span><button class='btn alt' id='hcb' style='width:auto;margin:0'>Run check</button></div>
 <div class='row' id='modrow' hidden><span>Moderation</span><button class='btn alt' id='modb' style='width:auto;margin:0'>Open reports</button></div>
 <div class='row' id='delrow' hidden><span>Delete my account</span><button class='btn alt' id='delb' style='width:auto;margin:0;color:#e5484d'>Delete</button></div>`);
   document.querySelector('nav [data-v="me"]').addEventListener('click', async () => {
-    $('#delrow').hidden = !me(); if (!me()) { $('#modrow').hidden = true; return; }
-    const a = await sb.from('bp_admins').select('user_id').eq('user_id', me().id).maybeSingle(); $('#modrow').hidden = !a.data;
+    $('#delrow').hidden = !me(); if (!me()) { $('#modrow').hidden = true; $('#hcrow').hidden = true; return; }
+    const a = await sb.from('bp_admins').select('user_id').eq('user_id', me().id).maybeSingle(); $('#modrow').hidden = !a.data; $('#hcrow').hidden = !a.data;
     const p = await sb.from('bp_profiles').select('banned').eq('id', me().id).maybeSingle();
     if (p.data && p.data.banned) BP.note('Your account is restricted. You can’t post, comment or message. Contact support if you think this is a mistake.');
   });
@@ -93,7 +93,7 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
     const out = [], add = (name, res) => out.push([name, res]);
     const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins'];
     for (const t of tables) { const r = await sb.from(t).select('*', { count: 'exact', head: true }); add('Table ' + t, r.error ? r.error.message : true); }
-    const cols = [['bp_videos', 'kind,image_paths,music_path,music_title'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
+    const cols = [['bp_videos', 'kind,image_paths,music_path,music_title,allow_download'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
     for (const [t, c] of cols) { const r = await sb.from(t).select(c).limit(1); add(`Columns in ${t}`, r.error ? r.error.message : true); }
     for (const b of ['videos', 'media', 'avatars']) { const r = await sb.storage.from(b).list('', { limit: 1 }); add('Storage bucket ' + b, r.error ? r.error.message : true); }
     if (me()) {

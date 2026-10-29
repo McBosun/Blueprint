@@ -361,3 +361,11 @@ create trigger bp_notify_like_t after insert on public.bp_likes for each row exe
 --   insert into public.bp_admins (user_id) select id from auth.users where email = 'YOUR_EMAIL_HERE';
 -- To allow bigger videos (paid plan; also raise Storage > Settings > upload limit):
 --   update storage.buckets set file_size_limit = 524288000 where id = 'videos';
+
+-- 12. Downloads: creators can allow or block downloads of a post (default: allowed)
+alter table public.bp_videos add column if not exists allow_download boolean not null default true;
+drop policy if exists "own video update" on public.bp_videos;
+create policy "own video update" on public.bp_videos for update to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+revoke update on public.bp_videos from authenticated, anon;
+grant update (allow_download) on public.bp_videos to authenticated;
