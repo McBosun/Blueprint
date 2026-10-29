@@ -253,3 +253,111 @@ drop policy if exists "reports add own" on public.bp_reports;
 create policy "reports add own" on public.bp_reports for insert to authenticated with check (reporter_id = (select auth.uid()));
 
 do $$ begin alter publication supabase_realtime add table public.bp_messages; exception when others then null; end $$;
+
+-- 11. Safety, moderation, feed ranking, like notifications, account deletion
+alter table public.bp_profiles
+  add column if not exists banned boolean not null default false,
+  add column if not exists terms_accepted_at timestamptz;
+
+create table if not exists public.bp_admins (user_id uuid primary key references auth.users(id) on delete cascade);
+alter table public.bp_admins enable row level security;
+drop policy if exists "admins read self" on public.bp_admins;
+create policy "admins read self" on public.bp_admins for select to authenticated using (user_id = (select auth.uid()));
+
+create or replace function public.bp_is_admin() returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.bp_admins where user_id = (select auth.uid())) $$;
+create or replace function public.bp_ok() returns boolean language sql stable security definer set search_path = '' as $$
+  select not exists (select 1 from public.bp_profiles where id = (select auth.uid()) and banned) $$;
+create or replace function public.bp_set_ban(uid uuid, flag boolean) returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.bp_is_admin() then raise exception 'Not allowed'; end if;
+  update public.bp_profiles set banned = flag where id = uid;
+end $$;
+create or replace function public.bp_delete_me() returns void language plpgsql security definer set search_path = '' as $$
+begin delete from auth.users where id = (select auth.uid()); end $$;
+
+-- People can edit their own profile details but never the ban flag
+revoke update on public.bp_profiles from authenticated, anon;
+grant update (username, display_name, bio, location, link, interests, avatar_url, share_views, dm_policy) on public.bp_profiles to authenticated;
+
+-- New accounts record that they accepted the terms
+create or replace function public.bp_handle_new_user() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_profiles (id, username, terms_accepted_at)
+  values (new.id, left(lower(regexp_replace(split_part(coalesce(new.email, 'user'), '@', 1), '[^a-zA-Z0-9_.]', '', 'g')), 15) || '_' || substr(new.id::text, 1, 4),
+          case when (new.raw_user_meta_data ->> 'terms') = 'true' then now() end)
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+-- Reports: posts, comments and people
+alter table public.bp_reports
+  add column if not exists target_type text not null default 'user' check (target_type in ('user','post','comment')),
+  add column if not exists video_id uuid references public.bp_videos(id) on delete set null,
+  add column if not exists comment_id uuid references public.bp_comments(id) on delete set null,
+  add column if not exists status text not null default 'open' check (status in ('open','actioned','dismissed')),
+  add column if not exists handled_by uuid,
+  add column if not exists handled_at timestamptz;
+drop policy if exists "reports admin read" on public.bp_reports;
+drop policy if exists "reports admin update" on public.bp_reports;
+create policy "reports admin read" on public.bp_reports for select to authenticated using (public.bp_is_admin());
+create policy "reports admin update" on public.bp_reports for update to authenticated using (public.bp_is_admin());
+
+-- Admins can remove any post, comment and file; banned people cannot post, comment, message or go live
+drop policy if exists "admin delete video" on public.bp_videos;
+drop policy if exists "admin delete comment" on public.bp_comments;
+drop policy if exists "bp admin delete files" on storage.objects;
+create policy "admin delete video" on public.bp_videos for delete to authenticated using (public.bp_is_admin());
+create policy "admin delete comment" on public.bp_comments for delete to authenticated using (public.bp_is_admin());
+create policy "bp admin delete files" on storage.objects for delete to authenticated
+  using (bucket_id in ('videos','media','avatars') and public.bp_is_admin());
+
+drop policy if exists "own video insert" on public.bp_videos;
+create policy "own video insert" on public.bp_videos for insert to authenticated with check (user_id = (select auth.uid()) and public.bp_ok());
+drop policy if exists "own comment insert" on public.bp_comments;
+create policy "own comment insert" on public.bp_comments for insert to authenticated with check (user_id = (select auth.uid()) and public.bp_ok());
+drop policy if exists "own live insert" on public.bp_lives;
+create policy "own live insert" on public.bp_lives for insert to authenticated with check (host_id = (select auth.uid()) and public.bp_ok());
+drop policy if exists "msgs send" on public.bp_messages;
+create policy "msgs send" on public.bp_messages for insert to authenticated
+  with check (sender_id = (select auth.uid()) and public.bp_ok() and public.bp_can_message(sender_id, recipient_id));
+
+-- Watch tracking and ranking stats
+create table if not exists public.bp_views (
+  id uuid primary key default gen_random_uuid(),
+  video_id uuid not null references public.bp_videos(id) on delete cascade,
+  viewer_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  watched_s int not null check (watched_s between 0 and 7200),
+  completed boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists bp_views_video_idx on public.bp_views (video_id);
+create index if not exists bp_views_viewer_idx on public.bp_views (viewer_id, created_at desc);
+alter table public.bp_views enable row level security;
+drop policy if exists "views add own" on public.bp_views;
+drop policy if exists "views read own" on public.bp_views;
+create policy "views add own" on public.bp_views for insert to authenticated with check (viewer_id = (select auth.uid()));
+create policy "views read own" on public.bp_views for select to authenticated using (viewer_id = (select auth.uid()));
+
+create or replace function public.bp_stats(ids uuid[]) returns table (video_id uuid, views bigint, saves bigint)
+language sql stable security definer set search_path = '' as $$
+  select i.id, (select count(*) from public.bp_views v where v.video_id = i.id), (select count(*) from public.bp_saves s where s.video_id = i.id)
+  from unnest(ids) as i(id);
+$$;
+
+-- Like notifications
+alter table public.bp_notifications drop constraint if exists bp_notifications_type_check;
+alter table public.bp_notifications add constraint bp_notifications_type_check check (type in ('live','comment','follow','view','like'));
+create or replace function public.bp_notify_like() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type, video_id)
+  select v.user_id, new.user_id, 'like', new.video_id from public.bp_videos v where v.id = new.video_id and v.user_id <> new.user_id;
+  return new;
+end $$;
+drop trigger if exists bp_notify_like_t on public.bp_likes;
+create trigger bp_notify_like_t after insert on public.bp_likes for each row execute function public.bp_notify_like();
+
+-- To make yourself a moderator, run this once with your own email:
+--   insert into public.bp_admins (user_id) select id from auth.users where email = 'YOUR_EMAIL_HERE';
+-- To allow bigger videos (paid plan; also raise Storage > Settings > upload limit):
+--   update storage.buckets set file_size_limit = 524288000 where id = 'videos';

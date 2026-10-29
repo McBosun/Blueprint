@@ -86,12 +86,13 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
 <div style='font-size:12px;color:var(--mut)'>${esc(p.location || '')}${p.location && p.link ? ' · ' : ''}${p.link ? `<a href='${esc(p.link)}' target='_blank' rel='noopener noreferrer' style='color:var(--blue)'>${esc(p.link.replace(/^https?:\/\//, ''))}</a>` : ''}</div>
 <div style='margin-top:8px'>${(p.interests || []).map(t => `<span class='pill'>#${esc(t)}</span>`).join('')}</div></div>
 <div class='st'><div><b>${posts.length}</b><span>Posts</span></div><div><b>${fc}</b><span>Followers</span></div><div><b>${f2.count || 0}</b><span>Following</span></div><div><b>${n(likes)}</b><span>Likes</span></div></div>
-<div class='pb'><button class='btn${following ? ' alt' : ''}' id='opf'>${following ? 'Following ✓' : 'Follow'}</button><button class='btn alt' id='opm'>Message</button></div>
+<div class='pb'><button class='btn${following ? ' alt' : ''}' id='opf'>${following ? 'Following ✓' : 'Follow'}</button><button class='btn alt' id='opm'>Message</button><button class='btn alt' id='opr' aria-label='Report' style='flex:0 0 auto'>⚑</button></div>
 <div class='pg'>${posts.map(tile).join('') || "<p class='pad' style='grid-column:1/-1;color:var(--mut)'>No posts yet.</p>"}</div>`;
     };
     draw();
     op.onclick = async e => {
       if (e.target.id === 'opx') return close();
+      if (e.target.id === 'opr') return window.BPReport && window.BPReport({ type: 'user', user: uid });
       if (e.target.id === 'opm') { if (!me()) return BP.openAuth(); close(); return window.BPDM && window.BPDM.open(uid, p.username); }
       if (e.target.id === 'opf') {
         if (!me()) return BP.openAuth();
@@ -104,7 +105,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     };
   }
 
-  BP.openProfile = openProfile;
+  BP.openProfile = openProfile; BP.openPost = openPost;
   // ---------- Search across real posts and people ----------
   let qt, found = [];
   const q0 = $('#q').oninput;
@@ -112,10 +113,10 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
   async function search(raw) {
     const v = raw.replace(/[,()%*\\]/g, ' ').trim(); if (!v) return;
     const tag = v.split(/\s+/)[0].toLowerCase().replace(/[^\w]/g, '');
-    const orQ = `title.ilike.*${v}*,caption.ilike.*${v}*` + (tag ? `,tags.cs.{${tag}}` : '');
+    const isTag = raw.startsWith('#'), orQ = isTag ? `tags.cs.{${tag}}` : `title.ilike.*${v}*,caption.ilike.*${v}*` + (tag ? `,tags.cs.{${tag}}` : '');
     const [pv, pp] = await Promise.all([
       sb.from('bp_videos').select('*').or(orQ).order('created_at', { ascending: false }).limit(30),
-      sb.from('bp_profiles').select('id,username,display_name').or(`username.ilike.*${v}*,display_name.ilike.*${v}*`).limit(10)
+      isTag ? Promise.resolve({ data: [] }) : sb.from('bp_profiles').select('id,username,display_name').or(`username.ilike.*${v}*,display_name.ilike.*${v}*`).limit(10)
     ]);
     if ($('#q').value.trim() !== raw) return; // a newer search is running
     found = await BP.build(pv.data || []);
@@ -246,7 +247,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
 
   // ---------- Notifications and profile views ----------
   let notes = [], noteCh = null, tabN = 'n';
-  const text = { live: x => `${x.u} is live: ${esc(x.body || '')}`, comment: x => `${x.u} commented: “${esc(x.body || '')}”`, follow: x => `${x.u} started following you`, view: x => `${x.u} viewed your profile` };
+  const text = { live: x => `${x.u} is live: ${esc(x.body || '')}`, comment: x => `${x.u} commented: “${esc(x.body || '')}”`, follow: x => `${x.u} started following you`, like: x => `${x.u} liked your post`, view: x => `${x.u} viewed your profile` };
   async function loadNotes() {
     if (!me()) { $('#bd').style.display = 'none'; return; }
     const r = await sb.from('bp_notifications').select('*').order('created_at', { ascending: false }).limit(50);
@@ -279,7 +280,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     $('#nt').classList.remove('on');
     if (row.dataset.u) return openProfile(row.dataset.u);
     const x = notes.find(n => n.id === row.dataset.i); if (!x) return;
-    if (x.type === 'comment') openPost(x.video_id);
+    if (x.type === 'comment' || x.type === 'like') openPost(x.video_id);
     else if (x.type === 'live') { const l = await sb.from('bp_lives').select('id,title,status').eq('id', x.live_id).maybeSingle(); l.data && l.data.status === 'live' ? openViewer(l.data.id, x.u, l.data.title) : BP.note('That live has ended.'); }
     else openProfile(x.actor_id);
   };

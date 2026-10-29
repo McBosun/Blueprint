@@ -6,20 +6,21 @@
   const MAXMB = C.maxMB || 50;
   let me = (await sb.auth.getSession()).data.session?.user || null;
   sb.auth.onAuthStateChange((_e, s) => { me = s?.user || null; });
-  window.BP = { sb, get me() { return me; }, openAuth: () => $('#au').classList.add('on'), load: () => load() };
+  window.BP = { sb, get me() { return me; }, openAuth: () => $('#au').classList.add('on'), load: () => load(), loadComments: p => loadComments(p) };
 
   // Message banner
   document.body.insertAdjacentHTML('beforeend', "<div id='bpn' style='position:fixed;left:12px;right:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:30;color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;display:none'></div>");
   const note = (t, ok) => { const el = $('#bpn'); el.style.background = ok ? '#1a9e5a' : '#e5484d'; el.textContent = t; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 7000); };
 
   // Sign in sheet
-  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='au'><div><h2>Welcome to Blueprint</h2><input id='ae' type='email' placeholder='Email'><input id='ap' type='password' placeholder='Password (6+ characters)'><div class='msg' id='am'></div><button class='btn' id='asi'>Sign in</button><button class='btn alt' id='asu'>Create account</button><button class='btn alt' id='ax'>Close</button></div></div>");
+  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='au'><div><h2>Welcome to Blueprint</h2><input id='ae' type='email' placeholder='Email'><input id='ap' type='password' placeholder='Password (6+ characters)'><label style='font-size:12px;display:flex;gap:8px;align-items:flex-start;margin:6px 0'><input type='checkbox' id='aterms' style='width:auto;margin-top:2px'><span>I’m at least 16 years old and agree to the <a href='terms.html' target='_blank'>Terms and Rules</a> and <a href='privacy.html' target='_blank'>Privacy Policy</a> (needed to create an account).</span></label><div class='msg' id='am'></div><button class='btn' id='asi'>Sign in</button><button class='btn alt' id='asu'>Create account</button><button class='btn alt' id='ax'>Close</button></div></div>");
   const openAuth = () => $('#au').classList.add('on');
   $('#ax').onclick = () => $('#au').classList.remove('on');
   async function auth(kind) {
     const m = $('#am'); m.className = 'msg'; m.textContent = 'One moment…';
     const cred = { email: $('#ae').value.trim(), password: $('#ap').value };
-    const r = kind === 'in' ? await sb.auth.signInWithPassword(cred) : await sb.auth.signUp(cred);
+    if (kind === 'up' && !$('#aterms').checked) { m.className = 'msg err'; m.textContent = 'Please confirm your age and agree to the Terms to create an account.'; return; }
+    const r = kind === 'in' ? await sb.auth.signInWithPassword(cred) : await sb.auth.signUp({ ...cred, options: { data: { terms: true } } });
     if (r.error) { m.className = 'msg err'; m.textContent = r.error.message; return; }
     if (!r.data.session) { m.className = 'msg ok'; m.textContent = 'Check your email to confirm, then sign in.'; return; }
     me = r.data.user; $('#au').classList.remove('on'); m.textContent = ''; load();
@@ -54,8 +55,27 @@
   }
   window.BP.build = build;
   window.BP.note = note;
+  // For You ranking: engagement, freshness, who you follow, tags you like; already-watched posts sink.
+  async function rankPosts(posts, rows) {
+    if (posts.length < 2) return posts;
+    const st = await sb.rpc('bp_stats', { ids: posts.map(p => p.id) }), S = {};
+    (st.data || []).forEach(x => { S[x.video_id] = x; });
+    const mine = new Set(); posts.forEach(p => { if (liked.has(p.id) || saved.has(p.id)) p.tag.forEach(t => mine.add(t)); });
+    let seen = new Set();
+    if (me) { const r = await sb.from('bp_views').select('video_id').eq('viewer_id', me.id).gt('created_at', new Date(Date.now() - 6048e5).toISOString()); seen = new Set((r.data || []).map(x => x.video_id)); }
+    const born = {}; rows.forEach(v => { born[v.id] = v.created_at; });
+    posts.forEach(p => {
+      const age = (Date.now() - new Date(born[p.id])) / 36e5, s = S[p.id] || {};
+      const eng = (p.l + (liked.has(p.id) ? 1 : 0)) * 3 + p.c.length * 4 + (Number(s.saves) || 0) * 5 + (Number(s.views) || 0) * .5;
+      p._s = eng / Math.pow(age + 2, 1.3) + (followed.has(p.uid) ? 6 : 0) + p.tag.filter(t => mine.has(t)).length * 3 + Math.random() * 1.5 - (seen.has(p.id) ? 8 : 0) - (me && p.uid === me.id ? 2 : 0);
+    });
+    posts.sort((a, b) => b._s - a._s);
+    const out = [], rest = [...posts]; // no more than two in a row from one creator
+    while (rest.length) { const i = rest.findIndex(p => !(out.length >= 2 && out[out.length - 1].uid === p.uid && out[out.length - 2].uid === p.uid)); out.push(rest.splice(i < 0 ? 0 : i, 1)[0]); }
+    return out.slice(0, 40).concat(out.slice(40).filter(p => saved.has(p.id)));
+  }
   async function load() {
-    const { data, error } = await sb.from('bp_videos').select('*').order('created_at', { ascending: false }).limit(40);
+    const { data, error } = await sb.from('bp_videos').select('*').order('created_at', { ascending: false }).limit(100);
     if (error) { note('Couldn’t load posts: ' + error.message); return; }
     if (!data.length) return; // keep demo posts until real ones exist
     liked.clear(); saved.clear(); followed.clear();
@@ -72,15 +92,15 @@
     let rows = data;
     const have = new Set(data.map(v => v.id)), missing = [...saved].filter(id => !have.has(id));
     if (missing.length) { const m = await sb.from('bp_videos').select('*').in('id', missing); rows = rows.concat(m.data || []); }
-    P = await build(rows);
+    P = await rankPosts(await build(rows), rows);
     renderFeed();
   }
   async function loadComments(p) {
-    const r = await sb.from('bp_comments').select('body,user_id,created_at').eq('video_id', p.id).order('created_at').limit(100);
+    const r = await sb.from('bp_comments').select('id,body,user_id,created_at').eq('video_id', p.id).order('created_at').limit(100);
     const rows = r.data || [], uids = [...new Set(rows.map(x => x.user_id))];
     const pr = uids.length ? await sb.from('bp_profiles').select('id,username').in('id', uids) : { data: [] };
     const nm = {}; (pr.data || []).forEach(x => { nm[x.id] = x.username; });
-    p.c = rows.map(x => ['@' + (nm[x.user_id] || 'user'), x.body]);
+    p.c = rows.map(x => ['@' + (nm[x.user_id] || 'user'), x.body, x.id, x.user_id]);
     drawC();
   }
 
@@ -165,10 +185,11 @@
     if (busy) return;
     const m = $('#umsg'), paths = [];
     const fail = t => { m.className = 'msg err'; m.textContent = t; busy = false; $('#post').disabled = false; };
-    const up = async (bucket, blob, name, type) => {
+    const up = async (bucket, blob, name, type, onP) => {
       const path = me.id + '/' + Date.now() + '-' + name;
-      const r = await sb.storage.from(bucket).upload(path, blob, { contentType: type });
-      if (r.error) throw r.error; paths.push([bucket, path]); return path;
+      if (window.BPUpload) await BPUpload.put(bucket, path, blob, type, onP);
+      else { const r = await sb.storage.from(bucket).upload(path, blob, { contentType: type }); if (r.error) throw r.error; }
+      paths.push([bucket, path]); return path;
     };
     const undo = () => Promise.all(paths.map(([b, x]) => sb.storage.from(b).remove([x])));
     const start = t => { busy = true; $('#post').disabled = true; m.className = 'msg'; m.textContent = t; };
@@ -192,11 +213,22 @@
     const f = $('#file').files[0];
     if (!f) return fail('Choose a video first.');
     if (!pending) return fail('Still reading the video. Wait a second and tap Post again, or choose a different file.');
-    if (f.size > MAXMB * 1048576) return fail(`This video is ${(f.size / 1048576).toFixed(0)} MB. The limit is ${MAXMB} MB. Trim or compress it and try again.`);
-    start('Uploading… keep this page open.');
+    let file = f, type = f.type || 'video/mp4';
+    const over = f.size > MAXMB * 1048576, mb = (f.size / 1048576).toFixed(0);
+    if (over && !(window.BPUpload && confirm(`This video is ${mb} MB and the limit is ${MAXMB} MB.\n\nCompress it now? This takes about as long as the video itself (${fmt(pending.d)}), and you need to keep this page open.`)))
+      return fail(`This video is ${mb} MB. The limit is ${MAXMB} MB. Trim or compress it and try again.`);
+    start('Preparing…');
     try {
+      if (over) {
+        m.textContent = 'Compressing… 0%';
+        const out = await BPUpload.compress(f, MAXMB * 0.9, pc => { m.textContent = 'Compressing… ' + pc + '%'; });
+        if (out.blob.size > MAXMB * 1048576) throw new Error('Still over the ' + MAXMB + ' MB limit after compressing. Please trim the video.');
+        file = out.blob; type = out.type;
+      }
       await ensureProfile();
-      const path = await up('videos', f, f.name.replace(/[^\w.-]/g, '_'), f.type || 'video/mp4');
+      m.textContent = 'Uploading… 0%';
+      const ext = over ? (type.includes('mp4') ? 'mp4' : 'webm') : (f.name.split('.').pop() || 'mp4');
+      const path = await up('videos', file, (f.name.replace(/\.[^.]+$/, '') + '.' + ext).replace(/[^\w.-]/g, '_'), type, pc => { m.textContent = 'Uploading… ' + pc + '%'; });
       const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'video', video_path: path, duration_s: pending.d });
       if (r.error) throw r.error;
     } catch (e) { await undo(); return fail(e.message || 'Upload failed. Try again.'); }
