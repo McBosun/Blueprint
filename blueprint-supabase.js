@@ -87,18 +87,7 @@
   // Photo slideshows and music
   window.slideHtml = p => `<div class="slides">${p.imgs.map((u, i) => `<img src="${u}" alt="" class="${i ? '' : 'on'}">`).join('')}</div>${p.music ? `<button class="mu" data-a="mu" data-src="${p.music}">♪ ${String(p.mt || 'Music').replace(/[<>&"']/g, '')}</button>` : ''}`;
   setInterval(() => { $$('.slides').forEach(s => { const im = [...s.children]; if (im.length < 2) return; const i = im.findIndex(x => x.classList.contains('on')); im[i].classList.remove('on'); im[(i + 1) % im.length].classList.add('on'); }); }, 4000);
-  const au = new Audio(); au.loop = true; let musicOn = false;
-  $('#feed').addEventListener('click', e => {
-    const b = e.target.closest('.mu'); if (!b) return;
-    if (au.src === b.dataset.src && !au.paused) { au.pause(); musicOn = false; b.classList.remove('on'); return; }
-    au.src = b.dataset.src; au.play().catch(() => note('Tap the music button again to play.')); musicOn = true; b.classList.add('on');
-  });
-  let scT; $('#feed').addEventListener('scroll', () => { clearTimeout(scT); scT = setTimeout(() => {
-    const f = $('#feed').getBoundingClientRect();
-    const cur = $$('.post').find(el => Math.abs(el.getBoundingClientRect().top - f.top) < f.height / 2);
-    const mu = cur && cur.querySelector('.mu');
-    if (mu && musicOn) { if (au.src !== mu.dataset.src) au.src = mu.dataset.src; au.play().catch(() => {}); mu.classList.add('on'); } else au.pause();
-  }, 200); });
+  // Sound and music autoplay are handled in blueprint-sound.js
 
   // Like, save, follow, comments (saved to the database)
   $('#feed').addEventListener('click', async e => {
