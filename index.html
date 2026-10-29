@@ -71,6 +71,8 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 .sheet label{font-size:12px;color:var(--mut);display:block;margin-top:6px}
 .rail .fw{background:var(--blue);font-size:18px;font-weight:700}.rail .fw.on{background:rgba(0,0,0,.32)}.rail .fw span{font-size:9px;font-weight:400}
 #feed:empty::before{content:"Follow creators and their videos will show up here.";display:block;padding:60px 24px;text-align:center;color:var(--mut)}
+.slides{position:absolute;inset:0;background:#000}.slides img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .6s}.slides img.on{opacity:1}
+.mu{position:absolute;left:12px;top:12px;z-index:2;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:99px;padding:8px 14px;font-size:12px;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.mu.on{background:var(--blue)}.mu.on::after{content:" · playing"}
 </style>
 </head>
 <body>
@@ -133,13 +135,13 @@ const ic={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-
 function visible(){let r=P.slice();if(tab==="follow")r=window.BP?r.filter(p=>p.uid&&followed.has(p.uid)):r.filter((p,i)=>i%2===0);if($("#fam").checked)r=r.filter(p=>!p.tag.includes("fitness"));return r}
 function renderFeed(){
  $("#feed").innerHTML=visible().map(p=>`<article class="post" data-id="${p.id}" style="background:${G[p.g%5]}">
- ${p.src?`<video src="${p.src}" loop muted playsinline controls></video>`:`<div class="big">▶<br>${p.t}</div>`}
+ ${p.imgs?slideHtml(p):p.src?`<video src="${p.src}" loop muted playsinline controls></video>`:`<div class="big">▶<br>${p.t}</div>`}
  <div class="rail">${p.uid&&(!window.BP||!window.BP.me||window.BP.me.id!==p.uid)?`<button class="fw ${followed.has(p.uid)?"on":""}" data-a="follow">${followed.has(p.uid)?"✓":"+"}<span>${followed.has(p.uid)?"Following":"Follow"}</span></button>`:""}
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
  <button data-a="sh">${ic.s}<span>Share</span></button></div>
- <div class="info">${p.tag.map(t=>`<span class="chip">#${t}</span>`).join("")}<span class="chip">${p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3><p>${p.u}${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
+ <div class="info">${p.tag.map(t=>`<span class="chip">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3><p>${p.u}${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
 function renderGrid(){

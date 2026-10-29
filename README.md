@@ -1,6 +1,6 @@
 # Blueprint
 
-Video-only social app: uploads up to 20 minutes, live streams up to 2 hours, step-by-step Blueprints.
+Video and photo social app: video uploads up to 20 minutes, photo posts with music, live streams up to 2 hours, step-by-step Blueprints.
 
 ## Set up
 1. Create a Supabase project.

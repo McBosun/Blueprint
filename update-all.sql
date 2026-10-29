@@ -78,3 +78,27 @@ update storage.buckets set allowed_mime_types = array['video/*'] where id = 'vid
 
 -- 7. Faster saved lists
 create index if not exists bp_saves_user_idx on public.bp_saves (user_id, created_at desc);
+
+-- 8. Photo posts with music
+alter table public.bp_videos
+  add column if not exists kind text not null default 'video' check (kind in ('video','photo')),
+  add column if not exists image_paths text[],
+  add column if not exists music_path text,
+  add column if not exists music_title text;
+alter table public.bp_videos alter column video_path drop not null;
+alter table public.bp_videos drop constraint if exists bp_post_shape;
+alter table public.bp_videos add constraint bp_post_shape check (
+  (kind = 'video' and video_path is not null) or
+  (kind = 'photo' and image_paths is not null and array_length(image_paths, 1) between 1 and 10));
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('media', 'media', true, 15728640, array['image/*','audio/*'])
+on conflict (id) do update set file_size_limit = 15728640, allowed_mime_types = array['image/*','audio/*'];
+drop policy if exists "bp media read" on storage.objects;
+drop policy if exists "bp media insert own" on storage.objects;
+drop policy if exists "bp media delete own" on storage.objects;
+create policy "bp media read" on storage.objects for select using (bucket_id = 'media');
+create policy "bp media insert own" on storage.objects for insert to authenticated
+  with check (bucket_id = 'media' and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy "bp media delete own" on storage.objects for delete to authenticated
+  using (bucket_id = 'media' and (storage.foldername(name))[1] = (select auth.uid())::text);
