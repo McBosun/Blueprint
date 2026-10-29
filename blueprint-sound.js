@@ -23,8 +23,8 @@
         wantsSound = true;
         if (!sound || needTap) v.muted = true;
         else if (v.dataset.u !== '1') { v.muted = false; v.dataset.u = '1'; }
-        if (v.paused) v.play().catch(() => { if (!v.muted) { v.muted = true; v.dataset.u = ''; needTap = true; v.play().catch(() => {}); } });
-      } else if (!v.paused) v.pause();
+        if (v.paused && v.dataset.up !== '1') v.play().catch(() => { if (!v.muted) { v.muted = true; v.dataset.u = ''; needTap = true; v.play().catch(() => {}); } });
+      } else { v.dataset.up = ''; v.closest('.post')?.classList.remove('paused'); if (!v.paused) v.pause(); }
     });
 
     const mu = cur && cur.querySelector('.mu');
@@ -60,5 +60,21 @@
   new MutationObserver(() => later(80)).observe(feed, { childList: true });
   document.addEventListener('visibilitychange', sync);
   setInterval(sync, 1000);
+  // Tap a video to pause or play (no on-screen controls). Drag the thin bar at the bottom to seek.
+  feed.addEventListener('click', e => {
+    const v = e.target; if (v.tagName !== 'VIDEO' || justOn) return;
+    const post = v.closest('.post');
+    if (v.paused) { v.dataset.up = ''; post.classList.remove('paused'); v.play().catch(() => {}); }
+    else { v.pause(); v.dataset.up = '1'; post.classList.add('paused'); }
+  });
+  let seeking = null;
+  const seek = e => { const r = seeking.b.getBoundingClientRect(); seeking.v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * seeking.v.duration; };
+  feed.addEventListener('pointerdown', e => {
+    const b = e.target.closest('.bar'); if (!b) return;
+    const v = b.closest('.post').querySelector('video'); if (!v || !v.duration) return;
+    seeking = { b, v }; seek(e);
+  });
+  feed.addEventListener('pointermove', e => { if (seeking) seek(e); });
+  ['pointerup', 'pointercancel'].forEach(ev => addEventListener(ev, () => { seeking = null; }));
   later(300);
 })();
