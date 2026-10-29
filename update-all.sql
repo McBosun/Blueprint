@@ -102,3 +102,82 @@ create policy "bp media insert own" on storage.objects for insert to authenticat
   with check (bucket_id = 'media' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy "bp media delete own" on storage.objects for delete to authenticated
   using (bucket_id = 'media' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- 9. Live broadcasting, notifications, profile views
+alter table public.bp_lives add column if not exists last_seen timestamptz not null default now();
+alter table public.bp_profiles add column if not exists share_views boolean not null default true;
+
+create table if not exists public.bp_notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.bp_profiles(id) on delete cascade,
+  actor_id uuid references public.bp_profiles(id) on delete cascade,
+  type text not null check (type in ('live','comment','follow','view')),
+  video_id uuid references public.bp_videos(id) on delete cascade,
+  live_id uuid references public.bp_lives(id) on delete cascade,
+  body text,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists bp_notes_user_idx on public.bp_notifications (user_id, created_at desc);
+alter table public.bp_notifications enable row level security;
+drop policy if exists "notes read own" on public.bp_notifications;
+drop policy if exists "notes update own" on public.bp_notifications;
+drop policy if exists "notes delete own" on public.bp_notifications;
+create policy "notes read own" on public.bp_notifications for select to authenticated using (user_id = (select auth.uid()));
+create policy "notes update own" on public.bp_notifications for update to authenticated using (user_id = (select auth.uid()));
+create policy "notes delete own" on public.bp_notifications for delete to authenticated using (user_id = (select auth.uid()));
+
+create table if not exists public.bp_profile_views (
+  profile_id uuid not null references public.bp_profiles(id) on delete cascade,
+  viewer_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  viewed_on date not null default current_date,
+  created_at timestamptz not null default now(),
+  primary key (profile_id, viewer_id, viewed_on),
+  check (profile_id <> viewer_id)
+);
+alter table public.bp_profile_views enable row level security;
+drop policy if exists "views insert" on public.bp_profile_views;
+drop policy if exists "views read" on public.bp_profile_views;
+create policy "views insert" on public.bp_profile_views for insert to authenticated
+  with check (viewer_id = (select auth.uid()) and exists (select 1 from public.bp_profiles p where p.id = (select auth.uid()) and p.share_views));
+create policy "views read" on public.bp_profile_views for select to authenticated
+  using (profile_id = (select auth.uid()) or viewer_id = (select auth.uid()));
+
+-- Notifications are created by triggers, never by the app
+create or replace function public.bp_notify_live() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type, live_id, body)
+  select f.follower_id, new.host_id, 'live', new.id, new.title from public.bp_follows f where f.following_id = new.host_id;
+  return new;
+end $$;
+drop trigger if exists bp_notify_live_t on public.bp_lives;
+create trigger bp_notify_live_t after insert on public.bp_lives for each row execute function public.bp_notify_live();
+
+create or replace function public.bp_notify_comment() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type, video_id, body)
+  select v.user_id, new.user_id, 'comment', new.video_id, left(new.body, 80)
+  from public.bp_videos v where v.id = new.video_id and v.user_id <> new.user_id;
+  return new;
+end $$;
+drop trigger if exists bp_notify_comment_t on public.bp_comments;
+create trigger bp_notify_comment_t after insert on public.bp_comments for each row execute function public.bp_notify_comment();
+
+create or replace function public.bp_notify_follow() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type) values (new.following_id, new.follower_id, 'follow');
+  return new;
+end $$;
+drop trigger if exists bp_notify_follow_t on public.bp_follows;
+create trigger bp_notify_follow_t after insert on public.bp_follows for each row execute function public.bp_notify_follow();
+
+create or replace function public.bp_notify_view() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type) values (new.profile_id, new.viewer_id, 'view');
+  return new;
+end $$;
+drop trigger if exists bp_notify_view_t on public.bp_profile_views;
+create trigger bp_notify_view_t after insert on public.bp_profile_views for each row execute function public.bp_notify_view();
+
+-- Instant notifications
+do $$ begin alter publication supabase_realtime add table public.bp_notifications; exception when others then null; end $$;

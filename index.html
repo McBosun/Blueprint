@@ -140,8 +140,8 @@ function renderFeed(){
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
- <button data-a="sh">${ic.s}<span>Share</span></button></div>
- <div class="info">${p.tag.map(t=>`<span class="chip">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3><p>${p.u}${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
+ <button data-a="sh">${ic.s}<span>Share</span></button>${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:""}</div>
+ <div class="info">${p.tag.map(t=>`<span class="chip">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3><p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
 function renderGrid(){
@@ -288,5 +288,6 @@ renderFeed();
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="blueprint-supabase.js"></script>
 <script src="blueprint-profile.js"></script>
+<script src="blueprint-extra.js"></script>
 </body>
 </html>

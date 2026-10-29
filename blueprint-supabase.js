@@ -48,10 +48,12 @@
         post.imgs = (v.image_paths || []).map(x => pub('media', x));
         if (v.music_path) { post.music = pub('media', v.music_path); post.mt = v.music_title || 'Music'; }
       } else post.src = pub('videos', v.video_path);
+      post.files = v.kind === 'photo' ? [...(v.image_paths || []).map(x => ['media', x]), ...(v.music_path ? [['media', v.music_path]] : [])] : [['videos', v.video_path]];
       return post;
     });
   }
   window.BP.build = build;
+  window.BP.note = note;
   async function load() {
     const { data, error } = await sb.from('bp_videos').select('*').order('created_at', { ascending: false }).limit(40);
     if (error) { note('Couldn’t load posts: ' + error.message); return; }
