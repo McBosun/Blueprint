@@ -69,6 +69,8 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 .pg{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px}.pg>div{aspect-ratio:3/4;position:relative;overflow:hidden;color:#fff;font-size:11px;padding:6px;display:flex;align-items:flex-end;cursor:pointer}
 .pill{display:inline-block;background:var(--card);border-radius:99px;padding:3px 10px;font-size:12px;margin:0 4px 4px 0;color:var(--blue)}
 .sheet label{font-size:12px;color:var(--mut);display:block;margin-top:6px}
+.rail .fw{background:var(--blue);font-size:18px;font-weight:700}.rail .fw.on{background:rgba(0,0,0,.32)}.rail .fw span{font-size:9px;font-weight:400}
+#feed:empty::before{content:"Follow creators and their videos will show up here.";display:block;padding:60px 24px;text-align:center;color:var(--mut)}
 </style>
 </head>
 <body>
@@ -123,16 +125,16 @@ let P=[
 {id:4,u:"@fit.sade",t:"Home workout, 12 minutes",tag:["fitness"],d:720,l:980,c:[],g:3,steps:["Warm up 2 min","Three rounds of squats and push-ups","Cool down"]},
 {id:5,u:"@travel.bola",t:"48 hours in Zanzibar on a budget",tag:["travel"],d:420,l:7600,c:[],g:4,steps:["Stone Town walk","Beach day","Sunset dhow cruise"]}
 ];
-let saved=new Set(),liked=new Set(),cur=null,tab="foryou";
+let saved=new Set(),liked=new Set(),followed=new Set(),cur=null,tab="foryou";
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 const n=x=>x>=1000?(x/1000).toFixed(1).replace(".0","")+"K":x;
 const ic={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>',b:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 12v8h16v-8M12 3v13M7 8l5-5 5 5"/></svg>'};
-function visible(){let r=P.slice();if(tab==="follow")r=r.filter((p,i)=>i%2===0);if($("#fam").checked)r=r.filter(p=>!p.tag.includes("fitness"));return r}
+function visible(){let r=P.slice();if(tab==="follow")r=window.BP?r.filter(p=>p.uid&&followed.has(p.uid)):r.filter((p,i)=>i%2===0);if($("#fam").checked)r=r.filter(p=>!p.tag.includes("fitness"));return r}
 function renderFeed(){
  $("#feed").innerHTML=visible().map(p=>`<article class="post" data-id="${p.id}" style="background:${G[p.g%5]}">
  ${p.src?`<video src="${p.src}" loop muted playsinline controls></video>`:`<div class="big">▶<br>${p.t}</div>`}
- <div class="rail">
+ <div class="rail">${p.uid&&(!window.BP||!window.BP.me||window.BP.me.id!==p.uid)?`<button class="fw ${followed.has(p.uid)?"on":""}" data-a="follow">${followed.has(p.uid)?"✓":"+"}<span>${followed.has(p.uid)?"Following":"Follow"}</span></button>`:""}
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
