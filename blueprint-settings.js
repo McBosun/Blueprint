@@ -20,7 +20,7 @@
 <details class='sgrp'><summary>Playback and wellbeing</summary><div id='sg2'></div></details>
 <details class='sgrp'><summary>Account and help</summary><div id='sg3'></div></details>
 <div id='ver' style='font-size:11px;color:var(--mut);padding:6px 2px'></div></div></div>`);
-  const VERSION = '20261029c', page = (document.querySelector('meta[name="bp-version"]') || {}).content || 'old';
+  const VERSION = '20261029d', page = (document.querySelector('meta[name="bp-version"]') || {}).content || 'old';
   document.getElementById('ver').innerHTML = 'Version ' + VERSION + (page === VERSION ? '' : " <b style='color:#e5484d'>Your phone is showing an old copy of the page. Close the tab, clear website data, and reopen.</b>");
   document.getElementById('setbtn').onclick = () => {
     const p = document.getElementById('setpanel'); p.hidden = !p.hidden;
@@ -32,7 +32,7 @@
   const plan = [
     ['sg1', ['#svc', '#dpp', '#fam']],
     ['sg2', ['#brk', '#tm']],
-    ['sg3', ['a[href="terms.html"]', '#hcb', '#modb', '#delb', '#so']]
+    ['sg3', ['a[href="terms.html"]', '#hcb', '#tcb', '#modb', '#delb', '#so']]
   ];
   function organize() {
     plan.forEach(([g, sels]) => {

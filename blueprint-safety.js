@@ -34,11 +34,12 @@
   // ---------- Settings rows ----------
   $('#outrow').insertAdjacentHTML('beforebegin', `<div class='row'><span>Legal</span><span><a href='terms.html' target='_blank' style='color:var(--blue)'>Terms and rules</a> · <a href='privacy.html' target='_blank' style='color:var(--blue)'>Privacy</a></span></div>
 <div class='row' id='hcrow' hidden><span>Check that everything works</span><button class='btn alt' id='hcb' style='width:auto;margin:0'>Run check</button></div>
+<div class='row' id='tcrow' hidden><span>Test checklist</span><button class='btn alt' id='tcb' style='width:auto;margin:0'>Open</button></div>
 <div class='row' id='modrow' hidden><span>Moderation</span><button class='btn alt' id='modb' style='width:auto;margin:0'>Open reports</button></div>
 <div class='row' id='delrow' hidden><span>Delete my account</span><button class='btn alt' id='delb' style='width:auto;margin:0;color:#e5484d'>Delete</button></div>`);
   document.querySelector('nav [data-v="me"]').addEventListener('click', async () => {
-    $('#delrow').hidden = !me(); if (!me()) { $('#modrow').hidden = true; $('#hcrow').hidden = true; return; }
-    const a = await sb.from('bp_admins').select('user_id').eq('user_id', me().id).maybeSingle(); $('#modrow').hidden = !a.data; $('#hcrow').hidden = !a.data;
+    $('#delrow').hidden = !me(); if (!me()) { $('#modrow').hidden = true; $('#hcrow').hidden = true; $('#tcrow').hidden = true; return; }
+    const a = await sb.from('bp_admins').select('user_id').eq('user_id', me().id).maybeSingle(); $('#modrow').hidden = !a.data; $('#hcrow').hidden = !a.data; $('#tcrow').hidden = !a.data;
     const p = await sb.from('bp_profiles').select('banned').eq('id', me().id).maybeSingle();
     if (p.data && p.data.banned) BP.note('Your account is restricted. You can’t post, comment or message. Contact support if you think this is a mistake.');
   });
@@ -108,5 +109,40 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
     add('Live relay (TURN) set up', C.iceServers && C.iceServers.some(x => String(x.urls).startsWith('turn')) ? true : 'Not set. Some mobile networks will fail to connect to lives.');
     const bad = out.filter(x => x[1] !== true);
     box.innerHTML = `<p><b>${bad.length ? bad.length + ' issue' + (bad.length > 1 ? 's' : '') + ' found' : 'Everything looks good'}</b></p>` + out.map(([n, r]) => `<div style='padding:3px 0;color:${r === true ? 'inherit' : '#e5484d'}'>${r === true ? '✓' : '✗'} ${esc(n)}${r === true ? '' : '<br><small>' + esc(r) + '</small>'}</div>`).join('') + (bad.length ? "<p style='color:var(--mut)'>Most ✗ lines about tables, columns or functions mean update-all.sql still needs to be run.</p>" : '');
+  };
+  // ---------- Test checklist (admins only; ticks are remembered on this phone) ----------
+  const STEPS = [
+    'Run the health check (Settings > Account and help). Fix every ✗ first.',
+    'Sign up accounts A and B (tick the age and terms box). Both show in Supabase > Authentication.',
+    'A posts a short video (under 10 MB). It shows in the feed and under A’s Me > Posts.',
+    'A posts 3 photos with a song. The slideshow plays and music starts after your first tap.',
+    'B follows A. A gets a 🔔 notification. B’s Following tab shows A’s posts.',
+    'B likes and comments on A’s post. A gets notifications. Refresh: they stay.',
+    'B saves a post. It stays in Blueprints after refresh.',
+    'B taps A’s @username and the profile opens. A’s Activity > Profile views shows B.',
+    'B searches a word from A’s title, then taps a #tag chip.',
+    'B reports A’s post (⚑). The report shows in Moderation and in the bp_reports table.',
+    'A and B follow each other, then A messages B. B sees a banner and an ✉️ count.',
+    'A deletes a post (🗑). It disappears and its files leave Storage.',
+    'A goes live. B sees the red bar, joins and chats. A ends: the replay appears on A’s profile.',
+    'Upload a video over the size limit. It offers to compress, then uploads with a % progress.',
+    'Download a video and a photo post (⬇). Share a post link and open it in a private tab.'
+  ];
+  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='tc'><div><h2>Test checklist</h2><div id='tcp' style='font-size:13px;color:var(--mut);margin-bottom:6px'></div><div id='tcl'></div><button class='btn alt' id='tcr'>Reset ticks</button><button class='btn' id='tcx'>Close</button></div></div>");
+  const KEY = 'bp-test-v1';
+  const loadTicks = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } };
+  const saveTicks = t => { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch (e) {} };
+  function drawTests() {
+    const t = loadTicks();
+    $('#tcl').innerHTML = STEPS.map((s, i) => `<label style='display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px'><input type='checkbox' data-i='${i}' style='width:auto;margin:3px 0 0'${t.includes(i) ? ' checked' : ''}><span style='${t.includes(i) ? 'text-decoration:line-through;color:var(--mut)' : ''}'>${i + 1}. ${esc(s)}</span></label>`).join('');
+    $('#tcp').textContent = t.length + ' of ' + STEPS.length + ' done' + (t.length === STEPS.length ? '. Ready for friends!' : '');
+  }
+  $('#tcb').onclick = () => { drawTests(); $('#tc').classList.add('on'); };
+  $('#tcx').onclick = () => $('#tc').classList.remove('on');
+  $('#tcr').onclick = () => { if (confirm('Clear all ticks?')) { saveTicks([]); drawTests(); } };
+  $('#tcl').onchange = e => {
+    const i = +e.target.dataset.i, t = loadTicks().filter(x => x !== i);
+    if (e.target.checked) t.push(i);
+    saveTicks(t); drawTests();
   };
 })();

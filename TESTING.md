@@ -16,3 +16,5 @@ First: Me > Settings > **Run check**. Fix every ✗ before testing (most mean up
 12. A goes live. B sees the red bar, joins, chats. A sees the viewer count. A ends: replay appears on A's profile.
 13. Upload a video over the size limit: it offers to compress, then uploads with a % progress.
 14. Share a post link (Share button), open it in a private tab: the post opens.
+
+Admins can also tick these off inside the app: Me > Settings > Account and help > Test checklist.
