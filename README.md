@@ -8,7 +8,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 3. Project Settings > API: put the Project URL and publishable key in `config.js`.
 4. Authentication > Sign In / Providers > Email: turn off "Confirm email" while testing.
 5. Deploy the folder to GitHub Pages. Authentication > URL Configuration: set Site URL to your Pages link.
-6. Make yourself a moderator: run the `bp_admins` line at the bottom of `update-all.sql` with your email.
+6. Moderator: the `bp_admins` statement near the bottom of `update-all.sql` makes one email a moderator. Change the email there if needed.
 7. Fill in the [brackets] in `terms.html` and `privacy.html` and have a lawyer review them.
 
 ## Files
