@@ -357,8 +357,11 @@ end $$;
 drop trigger if exists bp_notify_like_t on public.bp_likes;
 create trigger bp_notify_like_t after insert on public.bp_likes for each row execute function public.bp_notify_like();
 
--- To make yourself a moderator, run this once with your own email:
---   insert into public.bp_admins (user_id) select id from auth.users where email = 'YOUR_EMAIL_HERE';
+-- Make this account a moderator (it must already be signed up in the app):
+insert into public.bp_admins (user_id)
+select id from auth.users where lower(email) = lower('olatunbosunabi4@gmail.com')
+on conflict do nothing;
+
 -- To allow bigger videos (paid plan; also raise Storage > Settings > upload limit):
 --   update storage.buckets set file_size_limit = 524288000 where id = 'videos';
 
@@ -369,3 +372,111 @@ create policy "own video update" on public.bp_videos for update to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 revoke update on public.bp_videos from authenticated, anon;
 grant update (allow_download) on public.bp_videos to authenticated;
+
+-- 13. Notification settings and phone alerts
+create table if not exists public.bp_notif_prefs (
+  user_id uuid primary key references public.bp_profiles(id) on delete cascade,
+  likes boolean not null default true,
+  comments boolean not null default true,
+  follows boolean not null default true,
+  lives boolean not null default true,
+  messages boolean not null default true,
+  views boolean not null default true,
+  msg_preview boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+alter table public.bp_notif_prefs enable row level security;
+drop policy if exists "prefs read own" on public.bp_notif_prefs;
+drop policy if exists "prefs add own" on public.bp_notif_prefs;
+drop policy if exists "prefs change own" on public.bp_notif_prefs;
+create policy "prefs read own" on public.bp_notif_prefs for select to authenticated using (user_id = (select auth.uid()));
+create policy "prefs add own" on public.bp_notif_prefs for insert to authenticated with check (user_id = (select auth.uid()));
+create policy "prefs change own" on public.bp_notif_prefs for update to authenticated using (user_id = (select auth.uid()));
+
+create or replace function public.bp_pref(uid uuid, kind text) returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((select case kind when 'like' then likes when 'comment' then comments when 'follow' then follows
+                                    when 'live' then lives when 'message' then messages when 'view' then views else true end
+                   from public.bp_notif_prefs where user_id = uid), true) $$;
+
+-- Notifications now respect each person's choices
+create or replace function public.bp_notify_live() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type, live_id, body)
+  select f.follower_id, new.host_id, 'live', new.id, new.title
+  from public.bp_follows f where f.following_id = new.host_id and public.bp_pref(f.follower_id, 'live');
+  return new;
+end $$;
+create or replace function public.bp_notify_comment() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type, video_id, body)
+  select v.user_id, new.user_id, 'comment', new.video_id, left(new.body, 80)
+  from public.bp_videos v where v.id = new.video_id and v.user_id <> new.user_id and public.bp_pref(v.user_id, 'comment');
+  return new;
+end $$;
+create or replace function public.bp_notify_follow() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type) select new.following_id, new.follower_id, 'follow' where public.bp_pref(new.following_id, 'follow');
+  return new;
+end $$;
+create or replace function public.bp_notify_view() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type) select new.profile_id, new.viewer_id, 'view' where public.bp_pref(new.profile_id, 'view');
+  return new;
+end $$;
+create or replace function public.bp_notify_like() returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.bp_notifications (user_id, actor_id, type, video_id)
+  select v.user_id, new.user_id, 'like', new.video_id from public.bp_videos v
+  where v.id = new.video_id and v.user_id <> new.user_id and public.bp_pref(v.user_id, 'like');
+  return new;
+end $$;
+
+-- Phone alert subscriptions (one per phone)
+create table if not exists public.bp_push_subs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  ua text,
+  created_at timestamptz not null default now()
+);
+alter table public.bp_push_subs enable row level security;
+drop policy if exists "push read own" on public.bp_push_subs;
+drop policy if exists "push add own" on public.bp_push_subs;
+drop policy if exists "push remove own" on public.bp_push_subs;
+create policy "push read own" on public.bp_push_subs for select to authenticated using (user_id = (select auth.uid()));
+create policy "push add own" on public.bp_push_subs for insert to authenticated with check (user_id = (select auth.uid()));
+create policy "push remove own" on public.bp_push_subs for delete to authenticated using (user_id = (select auth.uid()));
+
+-- Private settings for the alert sender (nobody can read this from the app)
+create table if not exists public.bp_push_config (key text primary key, value text not null);
+alter table public.bp_push_config enable row level security;
+revoke all on public.bp_push_config from anon, authenticated;
+
+do $$ begin create extension if not exists pg_net; exception when others then null; end $$;
+
+-- When a notification or message is created, ask the send-push function to alert the person's phones.
+-- It does nothing until bp_push_config has the url and secret, and it can never block a post or message.
+create or replace function public.bp_push_notify() returns trigger language plpgsql security definer set search_path = '' as $$
+declare u text; s text; target uuid; kind text;
+begin
+  begin
+    if tg_table_name = 'bp_messages' then target := new.recipient_id; kind := 'message';
+    else target := new.user_id; kind := new.type; end if;
+    if not exists (select 1 from public.bp_push_subs where user_id = target) then return new; end if;
+    select value into u from public.bp_push_config where key = 'url';
+    select value into s from public.bp_push_config where key = 'secret';
+    if u is null or s is null then return new; end if;
+    if not public.bp_pref(target, kind) then return new; end if;
+    perform net.http_post(url := u,
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', s),
+      body := jsonb_build_object('table', tg_table_name, 'record', to_jsonb(new)));
+  exception when others then null;
+  end;
+  return new;
+end $$;
+drop trigger if exists bp_push_notes_t on public.bp_notifications;
+create trigger bp_push_notes_t after insert on public.bp_notifications for each row execute function public.bp_push_notify();
+drop trigger if exists bp_push_msgs_t on public.bp_messages;
+create trigger bp_push_msgs_t after insert on public.bp_messages for each row execute function public.bp_push_notify();
