@@ -45,7 +45,9 @@
   // ---------- Shareable links: #p-<post id> and #@username ----------
   async function route() {
     const h = decodeURIComponent(location.hash || '');
-    const m = h.match(/^#p-([0-9a-f-]{36})$/i), u = h.match(/^#@([a-z0-9_.]{3,20})$/);
+    const m = h.match(/^#p-([0-9a-f-]{36})$/i), u = h.match(/^#@([a-z0-9_.]{3,20})$/), dm = h.match(/^#m-([0-9a-f-]{36})$/i), lv = h.match(/^#l-([0-9a-f-]{36})$/i);
+    if (dm && window.BPDM) return window.BPDM.open(dm[1]);
+    if (lv && BP.openViewer) return BP.openViewer(lv[1], '', 'Live');
     if (m && BP.openPost) BP.openPost(m[1]);
     else if (u && BP.openProfile) {
       const r = await sb.from('bp_profiles').select('id').eq('username', u[1]).maybeSingle();

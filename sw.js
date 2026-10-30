@@ -1,5 +1,5 @@
 // Blueprint service worker. Network first, so updates always arrive; the cache is only a fallback for offline.
-const VERSION = '20261030a';
+const VERSION = '20261030b';
 const CACHE = 'blueprint-' + VERSION;
 const SHELL = ['./', 'index.html', 'terms.html', 'privacy.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
@@ -29,4 +29,21 @@ self.addEventListener('fetch', e => {
       return Response.error();
     }
   })());
+});
+
+// ---------- Phone alerts ----------
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data.json(); } catch (x) { d = { title: 'Blueprint', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Blueprint', {
+    body: d.body || '', icon: 'icon-192.png', badge: 'favicon-48.png', tag: d.tag || undefined, data: { url: d.url || './' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) { if ('focus' in c) { c.postMessage({ type: 'open', url }); return c.focus(); } }
+    return clients.openWindow(url);
+  }));
 });

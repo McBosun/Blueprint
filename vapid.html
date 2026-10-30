@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Blueprint key maker</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:640px;margin:0 auto;padding:20px;color:#0b1b3a}h1{color:#1e6bff}button{background:#1e6bff;color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:700;width:100%;margin:6px 0}textarea{width:100%;font:13px monospace;padding:8px;border:1px solid #ccd;border-radius:8px}.warn{background:#fff1f0;border:1px solid #e5484d;border-radius:10px;padding:10px 14px;font-size:14px}@media(prefers-color-scheme:dark){body{background:#07101f;color:#eaf1ff}textarea{background:#0f1d36;color:#eaf1ff}.warn{background:#2a1214}}</style></head><body>
+<h1>Phone alert keys</h1>
+<p>This page makes a fresh pair of keys for Blueprint phone alerts. It works on your own phone and sends nothing anywhere.</p>
+<button id="go">Make my keys</button>
+<div id="out" hidden>
+<p><b>1. Public key</b> (goes in <code>config.js</code> as <code>vapidKey</code>; safe to share)</p><textarea id="pub" rows="3" readonly></textarea>
+<p><b>2. Private key</b> (goes only in Supabase secrets as <code>VAPID_PRIVATE</code>)</p><textarea id="priv" rows="2" readonly></textarea>
+<p class="warn"><b>Keep the private key secret.</b> Never put it in GitHub, <code>config.js</code> or a message to anyone. Paste it into Supabase right away, then close this page. Making new keys later means every phone has to turn alerts on again.</p>
+</div>
+<script>
+const b64 = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+document.getElementById('go').onclick = async () => {
+  const k = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  document.getElementById('pub').value = b64(new Uint8Array(await crypto.subtle.exportKey('raw', k.publicKey)));
+  document.getElementById('priv').value = (await crypto.subtle.exportKey('jwk', k.privateKey)).d;
+  document.getElementById('out').hidden = false;
+};
+</script></body></html>

@@ -12,7 +12,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 7. Fill in the [brackets] in `terms.html` and `privacy.html` and have a lawyer review them.
 
 ## Files
-index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
+index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
 
 ## Optional config.js settings
 ```js
@@ -37,5 +37,18 @@ TURN relays are sold by services such as Metered, Twilio or Cloudflare, or you c
 
 ## Install as an app (PWA)
 Open the site on a phone: Android Chrome offers Install app; on iPhone use Safari > Share > Add to Home Screen. Me > Settings > Account and help has an Install button too.
-When you release an update, change the version number (20261030a) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
+When you release an update, change the version number (20261030b) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
 Store listings later: Android via PWABuilder or Bubblewrap (Google Play developer account), iPhone via a Capacitor wrapper (Apple Developer account and App Review; user-generated content apps need reporting, blocking and moderation, which Blueprint has).
+
+## Phone alerts (push) setup
+1. Open `vapid.html` on your site and tap Make my keys. Put the public key in `config.js` as `vapidKey: '...'`. Keep the private key secret.
+2. Supabase > Edge Functions > Deploy a new function > via Editor. Name it `send-push`, paste `send-push.ts`, deploy, then switch **Verify JWT** off in the function's settings.
+3. Supabase > Edge Functions > Secrets: add `VAPID_PUBLIC`, `VAPID_PRIVATE`, `VAPID_SUBJECT` (like `mailto:you@example.com`) and `PUSH_SECRET` (a long random string).
+4. In the SQL Editor (do not save this in GitHub) run, with your own values:
+```sql
+insert into public.bp_push_config (key, value) values
+  ('url', 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/send-push'),
+  ('secret', 'THE_SAME_PUSH_SECRET')
+on conflict (key) do update set value = excluded.value;
+```
+5. In the app: Me > Settings > Notifications > Turn on, then Test. On iPhone (iOS 16.4+) install Blueprint to the home screen first.

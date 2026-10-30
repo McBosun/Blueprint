@@ -16,6 +16,7 @@
   // ---------- Service worker and updates ----------
   if ('serviceWorker' in navigator) {
     const had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'open') { const h = new URL(e.data.url).hash; location.hash = ''; setTimeout(() => { location.hash = h; }, 60); } });
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) showBar('A new version of Blueprint is ready.', 'Reload', () => location.reload()); });
     addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => { setInterval(() => r.update().catch(() => {}), 3600000); }).catch(() => {}));
   }

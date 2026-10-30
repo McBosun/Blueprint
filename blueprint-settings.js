@@ -17,10 +17,11 @@
   pf.insertAdjacentHTML('beforebegin', `<div id='setwrap'><button class='btn alt' id='setbtn'><span>⚙ Settings</span><span id='setar'>▾</span></button>
 <div id='setpanel' hidden>
 <details class='sgrp'><summary>Privacy and messages</summary><div id='sg1'></div></details>
+<details class='sgrp'><summary>Notifications</summary><div id='sg4'></div></details>
 <details class='sgrp'><summary>Playback and wellbeing</summary><div id='sg2'></div></details>
 <details class='sgrp'><summary>Account and help</summary><div id='sg3'></div></details>
 <div id='ver' style='font-size:11px;color:var(--mut);padding:6px 2px'></div></div></div>`);
-  const VERSION = '20261030a', page = (document.querySelector('meta[name="bp-version"]') || {}).content || 'old';
+  const VERSION = '20261030b', page = (document.querySelector('meta[name="bp-version"]') || {}).content || 'old';
   document.getElementById('ver').innerHTML = 'Version ' + VERSION + (page === VERSION ? '' : " <b style='color:#e5484d'>Your phone is showing an old copy of the page. Close the tab, clear website data, and reopen.</b>");
   document.getElementById('setbtn').onclick = () => {
     const p = document.getElementById('setpanel'); p.hidden = !p.hidden;

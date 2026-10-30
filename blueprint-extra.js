@@ -43,7 +43,7 @@
 <div><div class='lt'><span class='badge'>LIVE</span><span id='vn'></span><span id='vc'></span><button id='vx' style='margin-left:auto'>Leave</button></div></div>
 <div><div id='vs' style='text-align:center;text-shadow:0 1px 3px #000;margin-bottom:6px'></div><div id='vch' style='font-size:13px;margin-bottom:8px;text-shadow:0 1px 3px #000'></div>
 <div style='display:flex;gap:6px'><input id='vi' maxlength='200' placeholder='Say something kind' style='margin:0'><button id='vsd'>Send</button></div></div></div></div>
-<div class='sheet' id='nt'><div><h2>Activity</h2><div style='display:flex;gap:8px'><button class='btn' id='n1'>Notifications</button><button class='btn alt' id='n2'>Profile views</button></div><div id='nl'></div><button class='btn alt' id='ncl'>Close</button></div></div>
+<div class='sheet' id='nt'><div><h2>Activity</h2><div style='display:flex;gap:8px'><button class='btn' id='n1'>Notifications</button><button class='btn alt' id='n2'>Profile views</button></div><div style='display:flex;gap:8px;margin:8px 0'><button class='btn alt' id='nmr' style='margin:0'>Mark all read</button><button class='btn alt' id='nclr' style='margin:0'>Clear all</button></div><div id='nl'></div><button class='btn alt' id='ncl'>Close</button></div></div>
 <div class='sheet' id='rp'><div><h2 id='rph'>Live replay</h2><p id='rpm' style='font-size:14px'></p><a id='rpa' class='btn' style='display:block;text-align:center;text-decoration:none' download='blueprint-replay.webm'>Download replay</a><button class='btn alt' id='rpx'>Close</button></div></div>`);
   $('#rpx').onclick = () => $('#rp').classList.remove('on');
 
@@ -105,7 +105,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     };
   }
 
-  BP.openProfile = openProfile; BP.openPost = openPost;
+  BP.openProfile = openProfile; BP.openPost = openPost; BP.openViewer = openViewer;
   // ---------- Search across real posts and people ----------
   let qt, found = [];
   const q0 = $('#q').oninput;
@@ -256,12 +256,15 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     notes = r.data || []; await names(notes.map(x => x.actor_id));
     notes.forEach(x => { x.u = '@' + (cache[x.actor_id] || 'someone'); });
     const un = notes.filter(x => !x.read).length; $('#bd').textContent = un > 9 ? '9+' : un; $('#bd').style.display = un ? 'block' : 'none';
+    if (navigator.setAppBadge) (un ? navigator.setAppBadge(un) : navigator.clearAppBadge()).catch(() => {});
   }
   async function drawNotes() {
     $('#n1').className = 'btn' + (tabN === 'n' ? '' : ' alt'); $('#n2').className = 'btn' + (tabN === 'v' ? '' : ' alt');
     if (!me()) { $('#nl').innerHTML = "<p>Sign in to see your activity.</p>"; return; }
     if (tabN === 'n') {
-      $('#nl').innerHTML = notes.map(x => `<div class='nrow ${x.read ? '' : 'un'}' data-i='${x.id}'><span>${text[x.type](x)}</span><small>${ago(x.created_at)}</small></div>`).join('') || '<p style="color:var(--mut)">Nothing yet. Likes aside, comments, follows and lives from people you follow show up here.</p>';
+      const items = [], lk = {}; // several likes on one post become one line
+      notes.forEach(x => { if (x.type === 'like' && x.video_id) { const g = lk[x.video_id]; if (g) { g.n++; g.un = g.un || !x.read; return; } lk[x.video_id] = { ...x, n: 1, un: !x.read }; items.push(lk[x.video_id]); } else items.push({ ...x, n: 1, un: !x.read }); });
+      $('#nl').innerHTML = items.map(x => `<div class='nrow ${x.un ? 'un' : ''}' data-i='${x.id}'><span>${x.type === 'like' && x.n > 1 ? `${x.u} and ${x.n - 1} other${x.n > 2 ? 's' : ''} liked your post` : text[x.type](x)}</span><small>${ago(x.created_at)}</small></div>`).join('') || '<p style="color:var(--mut)">Nothing yet. Likes, comments, follows and lives from people you follow show up here.</p>';
     } else {
       const r = await sb.from('bp_profile_views').select('viewer_id,created_at').eq('profile_id', me().id).order('created_at', { ascending: false }).limit(50);
       const rows = r.data || []; await names(rows.map(x => x.viewer_id));
@@ -277,6 +280,8 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
   };
   $('#n1').onclick = () => { tabN = 'n'; drawNotes(); }; $('#n2').onclick = () => { tabN = 'v'; drawNotes(); };
   $('#ncl').onclick = () => $('#nt').classList.remove('on');
+  $('#nmr').onclick = async () => { await sb.from('bp_notifications').update({ read: true }).eq('user_id', me().id).eq('read', false); await loadNotes(); drawNotes(); };
+  $('#nclr').onclick = async () => { if (!confirm('Clear all notifications?')) return; await sb.from('bp_notifications').delete().eq('user_id', me().id); await loadNotes(); drawNotes(); };
   $('#nl').onclick = async e => {
     const row = e.target.closest('.nrow'); if (!row) return;
     $('#nt').classList.remove('on');
