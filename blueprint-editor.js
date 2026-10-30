@@ -56,7 +56,8 @@ void main(){
   let S = fresh(), vid = document.createElement('video'), ml = new Audio(), mb = new Audio(), imgs = [], cur = 0, opened = false, exporting = false, cancel = false, picking = false, raf = 0, ctx, dst, mon, vG, mG, srcFile = null;
   vid.playsInline = true; vid.preload = 'auto'; ml.loop = true; mb.loop = true;
   const txc = document.createElement('canvas');
-  window.BPEdit = { video: null, photos: null, clear() { this.video = null; this.photos = null; stat(); } };
+  window.BPEdit = { video: null, photos: null, sound: null, clear() { this.video = null; this.photos = null; this.sound = null; stat(); } };
+  function preloadSound() { const q = window.BPEdit.sound; if (q) { S.music = { kind: 'lib', url: q.url, title: q.title, credit: q.credit }; mb.src = q.url; S.origVol = .4; } }
 
   // ---------- Drawing ----------
   function drawText() {
@@ -196,12 +197,12 @@ void main(){
   function show() { ids('vedt').classList.add('on'); opened = true; tabs(); panel(); drawText(); cancelAnimationFrame(raf); loop(); }
   function hide() { opened = false; cancelAnimationFrame(raf); musicStop(); vid.pause(); ids('vedt').classList.remove('on'); ids('vprog').style.display = 'none'; picking = false; }
   async function openVideo(file) {
-    S = fresh(); S.mode = 'video'; srcFile = file; tab = 'trim'; ids('vtt').textContent = 'Edit video'; initAudio(); await ctx.resume();
+    S = fresh(); S.mode = 'video'; srcFile = file; preloadSound(); tab = 'trim'; ids('vtt').textContent = 'Edit video'; initAudio(); await ctx.resume();
     vid.src = URL.createObjectURL(file); await new Promise((ok, no) => { vid.onloadedmetadata = ok; vid.onerror = () => no(new Error('This video can’t be opened for editing.')); }).catch(e => { BP.note(e.message); throw e; });
     S.dur = vid.duration; S.end = Math.min(S.dur, 1200); applyVol(); show(); vid.currentTime = 0; vid.play().then(() => { ids('vpl').style.display = 'none'; }).catch(() => { ids('vpl').style.display = 'flex'; });
   }
   async function openPhotos(files) {
-    S = fresh(); S.mode = 'photo'; tab = 'sound'; ids('vtt').textContent = 'Edit photos'; initAudio(); await ctx.resume(); imgs = []; cur = 0;
+    S = fresh(); S.mode = 'photo'; tab = 'sound'; preloadSound(); ids('vtt').textContent = 'Edit photos'; initAudio(); await ctx.resume(); imgs = []; cur = 0;
     for (const f of files.slice(0, 10)) { const im = new Image(); im.src = URL.createObjectURL(f); try { await im.decode(); imgs.push(im); } catch (e) { BP.note('One photo can’t be opened. Use JPG or PNG.'); } }
     if (!imgs.length) return; S.fit = 'fit'; show();
     ids('vstage').insertAdjacentHTML('beforeend', `<div id='vth' style='position:absolute;bottom:8px;left:0;right:0;display:flex;gap:6px;justify-content:center'>${imgs.map((im, i) => `<img src='${im.src}' data-i='${i}' style='width:44px;height:44px;object-fit:cover;border-radius:8px;border:2px solid ${i ? 'transparent' : '#1e6bff'}'>`).join('')}</div>`);
@@ -244,7 +245,8 @@ void main(){
   }
 
   // ---------- Hook into the post sheet ----------
-  const stat = () => { const e = window.BPEdit, s = ids('edst'); if (!s) return; s.innerHTML = e.video ? `✓ Edited video ready (${tm(e.video.duration)}) · <a id='edrm' style='text-decoration:underline;cursor:pointer'>remove edits</a>` : e.photos ? `✓ ${e.photos.blobs.length} edited photos ready · <a id='edrm' style='text-decoration:underline;cursor:pointer'>remove edits</a>` : ''; const rm = ids('edrm'); if (rm) rm.onclick = () => { window.BPEdit.video = window.BPEdit.photos = null; stat(); }; };
+  const stat = () => { const e = window.BPEdit, s = ids('edst'); if (!s) return; const snd = e.sound ? `<div>♪ Using sound: ${esc(e.sound.title)} · <a id='edsx' style='text-decoration:underline;cursor:pointer'>remove</a></div>` : ''; s.innerHTML = snd + (e.video ? `✓ Edited video ready (${tm(e.video.duration)}) · <a id='edrm' style='text-decoration:underline;cursor:pointer'>remove edits</a>` : e.photos ? `✓ ${e.photos.blobs.length} edited photos ready · <a id='edrm' style='text-decoration:underline;cursor:pointer'>remove edits</a>` : ''); const sx = ids('edsx'); if (sx) sx.onclick = () => { window.BPEdit.sound = null; stat(); }; const rm = ids('edrm'); if (rm) rm.onclick = () => { window.BPEdit.video = window.BPEdit.photos = null; stat(); }; };
+  window.BPEdit.refresh = stat;
   $('#file').insertAdjacentHTML('afterend', "<button class='btn alt' id='edv' hidden>✂ Edit video</button><div id='edst' style='font-size:13px;color:var(--blue);margin:4px 0'></div>");
   $('#pimg').insertAdjacentHTML('afterend', "<button class='btn alt' id='edp' hidden>✂ Edit photos</button>");
   $('#file').addEventListener('change', () => { window.BPEdit.video = null; stat(); ids('edv').hidden = !$('#file').files[0]; });

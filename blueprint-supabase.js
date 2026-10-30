@@ -33,11 +33,14 @@
   async function build(rows) {
     if (!rows.length) return [];
     const ids = rows.map(v => v.id), uids = [...new Set(rows.map(v => v.user_id))];
-    const [pr, lk, cm] = await Promise.all([
+    const sids = [...new Set(rows.map(v => v.sound_id).filter(Boolean))];
+    const [pr, lk, cm, sd] = await Promise.all([
       sb.from('bp_profiles').select('id,username').in('id', uids),
       sb.from('bp_likes').select('video_id').in('video_id', ids),
-      sb.from('bp_comments').select('video_id').in('video_id', ids)
+      sb.from('bp_comments').select('video_id').in('video_id', ids),
+      sids.length ? sb.from('bp_sounds').select('id,title,artist,audio_path').in('id', sids) : { data: [] }
     ]);
+    const SD = {}; (sd.data || []).forEach(x => { SD[x.id] = x; });
     const nm = {}; (pr.data || []).forEach(x => { nm[x.id] = x.username; });
     const cnt = r => { const m = {}; (r.data || []).forEach(x => { m[x.video_id] = (m[x.video_id] || 0) + 1; }); return m; };
     const L = cnt(lk), K = cnt(cm);
@@ -50,6 +53,7 @@
         if (v.music_path) { post.music = pub('media', v.music_path); post.mt = v.music_title || 'Music'; }
       } else post.src = pub('videos', v.video_path);
       if (v.music_url) { post.music = v.music_url; post.mt = v.music_title || 'Sound'; post.mc = String(v.music_credit || '').replace(/[<>&"']/g, ''); }
+      if (v.sound_id && SD[v.sound_id]) { const q = SD[v.sound_id]; post.sid = q.id; post.surl = pub('sounds', q.audio_path); post.sname = 'Original sound · ' + String(q.artist).replace(/[<>&"']/g, ''); }
       post.mv = v.music_vol ?? 0.8; post.ov = v.orig_vol ?? 1; post.ms = v.music_start || 0;
       post.files = v.kind === 'photo' ? [...(v.image_paths || []).map(x => ['media', x]), ...(v.music_path ? [['media', v.music_path]] : [])] : [['videos', v.video_path]];
       return post;
@@ -150,7 +154,7 @@
   $('#up h2').insertAdjacentHTML('afterend', "<div style='display:flex;gap:8px'><button class='btn' id='m1'>Video</button><button class='btn alt' id='m2'>Photos + music</button></div>");
   $('#file').insertAdjacentHTML('afterend', "<div id='pp' hidden><input type='file' id='pimg' accept='image/*' multiple><input type='file' id='pmus' accept='audio/*'><div style='font-size:12px;color:var(--mut)'>Pick 1 to 10 photos, then optional music from your phone (max 15 MB). Only use music you have the right to share.</div></div>");
   $('#umsg').insertAdjacentHTML('afterend', `<div id='mx' style='font-size:12px;color:var(--mut)'>Maximum video size: ${MAXMB} MB.</div>`);
-  $('#ud').insertAdjacentHTML('afterend', "<label style='font-size:13px;display:flex;gap:8px;align-items:center;margin:6px 0'><input type='checkbox' id='adl' checked style='width:auto;margin:0'> Let others download this post</label>");
+  $('#ud').insertAdjacentHTML('afterend', "<label style='font-size:13px;display:flex;gap:8px;align-items:center;margin:6px 0'><input type='checkbox' id='adl' checked style='width:auto;margin:0'> Let others download this post</label><label style='font-size:13px;display:flex;gap:8px;align-items:center;margin:6px 0'><input type='checkbox' id='asd' checked style='width:auto;margin:0'> Let others use this video’s sound</label>");
   let mode = 'video', busy = false;
   const setMode = k => {
     mode = k; $('#m1').className = 'btn' + (k === 'video' ? '' : ' alt'); $('#m2').className = 'btn' + (k === 'photo' ? '' : ' alt');
@@ -176,6 +180,7 @@
     const ins = await sb.from('bp_profiles').insert({ id: me.id, username: un });
     if (ins.error) throw new Error('Your profile is missing. Run update-all.sql in Supabase, then try again. (' + ins.error.message + ')');
   }
+  const soundFields = () => { const q = window.BPEdit && window.BPEdit.sound; return q ? { music_url: q.url, music_title: q.title, music_credit: q.credit || '', music_vol: 0.8, orig_vol: 0.4, music_start: 0 } : null; };
   const meta = () => {
     const d = $('#ud').value, steps = d.split('\n').filter(x => /^\d+[.)]/.test(x.trim())).map(x => x.replace(/^\d+[.)]\s*/, ''));
     return { title: $('#ut').value.trim() || 'Untitled', caption: d, tags: (d.match(/#\w+/g) || []).map(x => x.slice(1)), steps: steps.length ? steps : null, allow_download: $('#adl') ? $('#adl').checked : true };
@@ -208,7 +213,7 @@
         const ip = []; let i = 0;
         for (const f of imgs) ip.push(await up('media', (EP ? f : await toJpeg(f)), (i++) + '.jpg', 'image/jpeg'));
         const mp = mus ? await up('media', mus, 'music-' + mus.name.replace(/[^\w.-]/g, '_'), mus.type || 'audio/mpeg') : null;
-        const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'photo', image_paths: ip, music_path: mp, music_title: mus ? mus.name.replace(/\.[^.]+$/, '') : null, duration_s: Math.max(1, ip.length * 5), ...(EP && EP.music ? EP.music : {}) });
+        const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'photo', image_paths: ip, music_path: mp, music_title: mus ? mus.name.replace(/\.[^.]+$/, '') : null, duration_s: Math.max(1, ip.length * 5), ...((EP && EP.music) || soundFields() || {}) });
         if (r.error) throw r.error;
       } catch (e) { await undo(); return fail(e.message || 'Upload failed. Try again.'); }
       return finish();
@@ -223,6 +228,7 @@
     if (over && !(window.BPUpload && confirm(`This video is ${mb} MB and the limit is ${MAXMB} MB.\n\nCompress it now? This takes about as long as the video itself (${fmt(dsec)}), and you need to keep this page open.`)))
       return fail(`This video is ${mb} MB. The limit is ${MAXMB} MB. Trim or compress it and try again.`);
     start('Preparing…');
+    let sid = null;
     try {
       if (over) {
         m.textContent = 'Compressing… 0%';
@@ -234,9 +240,19 @@
       m.textContent = 'Uploading… 0%';
       const ext = over ? (type.includes('mp4') ? 'mp4' : 'webm') : (fname.split('.').pop() || 'mp4');
       const path = await up('videos', file, (fname.replace(/\.[^.]+$/, '') + '.' + ext).replace(/[^\w.-]/g, '_'), type, pc => { m.textContent = 'Uploading… ' + pc + '%'; });
-      const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'video', video_path: path, duration_s: dsec, ...(ED && ED.music ? ED.music : {}) });
+      if (window.BPMp3 && $('#asd') && $('#asd').checked && dsec <= 180) {
+        let sp = null;
+        try {
+          m.textContent = 'Preparing the sound…';
+          const mp3 = await BPMp3.fromBlob(file); sp = await up('sounds', mp3, 'original.mp3', 'audio/mpeg');
+          const who = (await sb.from('bp_profiles').select('username').eq('id', me.id).maybeSingle()).data;
+          const si = await sb.from('bp_sounds').insert({ title: 'Original sound', artist: who ? who.username : 'user', genre: 'Original sound', audio_path: sp, duration_s: Math.round(dsec) }).select('id').single();
+          if (si.error) await sb.storage.from('sounds').remove([sp]); else sid = si.data.id;
+        } catch (e) { /* sharing the sound is optional */ }
+      }
+      const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'video', video_path: path, duration_s: dsec, sound_id: sid, ...((ED && ED.music) || soundFields() || {}) });
       if (r.error) throw r.error;
-    } catch (e) { await undo(); return fail(e.message || 'Upload failed. Try again.'); }
+    } catch (e) { await undo(); if (sid) await sb.from('bp_sounds').delete().eq('id', sid); return fail(e.message || 'Upload failed. Try again.'); }
     finish();
   };
 

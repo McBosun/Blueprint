@@ -122,7 +122,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     found = await BP.build(pv.data || []);
     const people = (pp.data || []).map(x => `<div class='row' data-uid='${x.id}' style='cursor:pointer'><span>@${esc(x.username)} <small style='color:var(--mut)'>${esc(x.display_name || '')}</small></span><b style='color:var(--blue)'>View</b></div>`).join('');
     $('#grid').innerHTML = (people ? `<div style='column-span:all;margin-bottom:8px'>${people}</div>` : '') +
-      found.map((p, i) => `<div class="tile" data-id="${esc(p.id)}"><div class="th" style="background:${G[p.g % 5]};height:${110 + (i % 3) * 40}px">${esc(p.t)}</div><div class="m"><b>${esc(p.u)}</b>${n(p.l)} likes</div></div>`).join('') ||
+      found.map((p, i) => `<div class="tile" data-id="${esc(p.id)}"><div class="th" style="background:${G[p.g % 5]};height:${110 + (i % 3) * 40}px">${typeof tileMedia === 'function' ? tileMedia(p) : ''}<span class="tt">${esc(p.t)}</span></div><div class="m"><b>${esc(p.u)}</b>${n(p.l)} likes</div></div>`).join('') ||
       (people ? '' : `<p class='pad'>No results for “${esc(raw)}”.</p>`);
   }
   $('#grid').addEventListener('click', e => {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="bp-version" content="20261030c">
+<meta name="bp-version" content="20261030d">
 <meta name="theme-color" content="#1e6bff">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
@@ -155,12 +155,12 @@ function renderFeed(){
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
  <button data-a="sh">${ic.s}<span>Share</span></button>${p.src||p.imgs?(p.dl===false&&!(window.BP&&window.BP.me&&window.BP.me.id===p.uid)?"":`<button data-a="dl">⬇<span>Download</span></button>`):""}${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}</div>
- <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.mc?`<p style="font-size:11px;opacity:.85">♪ ${p.mc}</p>`:""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
+ <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.music||p.surl?`<p class="snd" data-su="${p.music||p.surl}" data-st="${p.music?p.mt:p.sname}" data-sc="${p.mc||""}" style="font-size:12px;opacity:.92;cursor:pointer">♪ ${p.music?p.mt:p.sname}${p.mc?" · "+p.mc:""}</p>`:""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
 function renderGrid(){
  const q=$("#q").value.toLowerCase();
- $("#grid").innerHTML=P.filter(p=>(p.t+p.tag.join(" ")+p.u).toLowerCase().includes(q)).map((p,i)=>`<div class="tile" data-id="${p.id}"><div class="th" style="background:${G[p.g%5]};height:${110+(i%3)*40}px">${p.t}</div><div class="m"><b>${p.u}</b>${n(p.l)} likes · ${fmt(p.d)}</div></div>`).join("")||'<p class="pad">Nothing found yet.</p>';
+ $("#grid").innerHTML=P.filter(p=>(p.t+p.tag.join(" ")+p.u).toLowerCase().includes(q)).map((p,i)=>`<div class="tile" data-id="${p.id}"><div class="th" style="background:${G[p.g%5]};height:${110+(i%3)*40}px">${typeof tileMedia==="function"?tileMedia(p):""}<span class="tt">${p.t}</span></div><div class="m"><b>${p.u}</b>${n(p.l)} likes · ${fmt(p.d)}</div></div>`).join("")||'<p class="pad">Nothing found yet.</p>';
 }
 function renderSaved(){
  const s=P.filter(p=>saved.has(p.id));
@@ -307,21 +307,24 @@ addEventListener('error', function (e) {
   b.onclick = function () { b.remove(); };
 });
 </script>
-<script src="config.js?v=20261030c"></script>
+<script src="config.js?v=20261030d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="blueprint-supabase.js?v=20261030c"></script>
-<script src="blueprint-profile.js?v=20261030c"></script>
-<script src="blueprint-extra.js?v=20261030c"></script>
-<script src="blueprint-messages.js?v=20261030c"></script>
-<script src="blueprint-sound.js?v=20261030c"></script>
+<script src="blueprint-supabase.js?v=20261030d"></script>
+<script src="blueprint-profile.js?v=20261030d"></script>
+<script src="blueprint-extra.js?v=20261030d"></script>
+<script src="blueprint-messages.js?v=20261030d"></script>
+<script src="blueprint-sound.js?v=20261030d"></script>
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.1.0/dist/tus.min.js"></script>
-<script src="blueprint-upload.js?v=20261030c"></script>
-<script src="blueprint-feed.js?v=20261030c"></script>
-<script src="blueprint-safety.js?v=20261030c"></script>
-<script src="blueprint-settings.js?v=20261030c"></script>
-<script src="blueprint-install.js?v=20261030c"></script>
-<script src="blueprint-notify.js?v=20261030c"></script>
-<script src="blueprint-sounds.js?v=20261030c"></script>
-<script src="blueprint-editor.js?v=20261030c"></script>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<script src="blueprint-upload.js?v=20261030d"></script>
+<script src="blueprint-feed.js?v=20261030d"></script>
+<script src="blueprint-safety.js?v=20261030d"></script>
+<script src="blueprint-settings.js?v=20261030d"></script>
+<script src="blueprint-install.js?v=20261030d"></script>
+<script src="blueprint-notify.js?v=20261030d"></script>
+<script src="blueprint-sounds.js?v=20261030d"></script>
+<script src="blueprint-editor.js?v=20261030d"></script>
+<script src="blueprint-mp3.js?v=20261030d"></script>
+<script src="blueprint-explore.js?v=20261030d"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@
   const sb = BP.sb, me = () => BP.me, C = window.BLUEPRINT_CONFIG || {};
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const mmss = s => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
-  const GENRES = ['All', 'Afrobeats', 'Amapiano', 'Highlife', 'Afro-fusion', 'Gospel', 'Hip-hop', 'Fuji', 'Instrumental', 'Other'];
+  const GENRES = ['All', 'Original sound', 'Afrobeats', 'Amapiano', 'Highlife', 'Afro-fusion', 'Gospel', 'Hip-hop', 'Fuji', 'Instrumental', 'Other'];
   const FREE = ['Afrobeat', 'African', 'Highlife', 'Gospel', 'Hip-hop', 'Pop', 'Electronic', 'Reggae', 'Chillout', 'Classical', 'Acoustic', 'Cinematic'];
   let cb = null, tab = 'mine', genre = 'All', list = [];
   const prev = new Audio(); prev.preload = 'none';
@@ -67,7 +67,7 @@
     if (!me()) { box.innerHTML = "<p>Sign in to add your music.</p><button class='btn' id='sng'>Sign in</button>"; document.getElementById('sng').onclick = () => { close(); BP.openAuth(); }; return; }
     box.innerHTML = `<p style='font-size:14px'>Share your own track so people can use it in their videos and photos. Nigerian artists are welcome.</p>
 <input type='file' id='sf' accept='audio/*'><input id='st' maxlength='80' placeholder='Song title'><input id='sa' maxlength='60' placeholder='Artist name'>
-<select id='sg' style='width:100%;padding:10px;border-radius:10px;background:var(--card);color:var(--fg);border:1px solid var(--line);margin:6px 0'>${GENRES.slice(1).map(g => `<option>${g}</option>`).join('')}</select>
+<select id='sg' style='width:100%;padding:10px;border-radius:10px;background:var(--card);color:var(--fg);border:1px solid var(--line);margin:6px 0'>${GENRES.slice(2).map(g => `<option>${g}</option>`).join('')}</select>
 <label style='display:flex;gap:8px;font-size:13px;align-items:flex-start;margin:8px 0'><input type='checkbox' id='so2' style='width:auto;margin-top:2px'><span>I own this music, or I have permission to share it, and I allow people on Blueprint to use it in their posts. Maximum 15 MB.</span></label>
 <div class='msg' id='sm'></div><button class='btn' id='sup'>Upload sound</button>`;
     document.getElementById('sup').onclick = uploadSound;
@@ -85,4 +85,25 @@
     if (r.error) { sb.storage.from('sounds').remove([path]); m.className = 'msg err'; m.textContent = r.error.message; return; }
     m.className = 'msg ok'; m.textContent = 'Added. People can now use your sound.'; setTimeout(() => { tab = 'mine'; draw(); }, 900);
   }
+
+  // ---------- "Use this sound" sheet (opened from a post's ♪ line) ----------
+  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='sdt'><div><h2 id='sdh'>Sound</h2><div id='sdb' style='font-size:14px;margin-bottom:10px;color:var(--mut)'></div><div style='display:flex;gap:8px'><button class='btn alt' id='sdp' style='margin:0'>▶ Preview</button><button class='btn' id='sdu' style='margin:0'>Use this sound</button></div><button class='btn alt' id='sdd' hidden>Download MP3</button><button class='btn alt' id='sdx'>Close</button></div></div>");
+  let cur = null; const sd = document.getElementById.bind(document);
+  const sclose = () => { prev.pause(); sd('sdt').classList.remove('on'); };
+  window.BPSounds.detail = s => {
+    cur = s; sd('sdh').textContent = s.title || 'Sound'; sd('sdb').textContent = s.credit || ''; sd('sdp').textContent = '▶ Preview';
+    const own = /\/storage\/v1\/object\/public\/sounds\//.test(s.url); sd('sdd').hidden = !own;
+    if (own) sd('sdd').dataset.url = s.url + '?download=' + encodeURIComponent((s.title || 'sound').replace(/[^\w-]+/g, '_') + '.mp3');
+    sd('sdt').classList.add('on');
+  };
+  sd('sdx').onclick = sclose;
+  sd('sdp').onclick = () => { if (prev.src === cur.url && !prev.paused) { prev.pause(); sd('sdp').textContent = '▶ Preview'; } else { prev.src = cur.url; prev.play().catch(() => BP.note('Couldn’t play this sound.')); sd('sdp').textContent = '❚❚ Pause'; } };
+  sd('sdd').onclick = () => { const a = document.createElement('a'); a.href = sd('sdd').dataset.url; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); };
+  sd('sdu').onclick = () => {
+    if (!me()) { sclose(); return BP.openAuth(); }
+    window.BPEdit = window.BPEdit || {}; window.BPEdit.sound = { url: cur.url, title: cur.title, credit: cur.credit || '' };
+    sclose(); document.getElementById('up').classList.add('on'); if (window.BPEdit.refresh) window.BPEdit.refresh();
+    BP.note('Sound ready. Choose a video or photos, then tap Edit to adjust it.', true);
+  };
+  document.getElementById('feed').addEventListener('click', e => { const t = e.target.closest('.snd'); if (t && t.dataset.su) window.BPSounds.detail({ url: t.dataset.su, title: t.dataset.st, credit: t.dataset.sc }); });
 })();

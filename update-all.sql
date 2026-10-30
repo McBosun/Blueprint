@@ -525,3 +525,7 @@ create policy "bp sounds delete own" on storage.objects for delete to authentica
 drop policy if exists "bp admin delete files" on storage.objects;
 create policy "bp admin delete files" on storage.objects for delete to authenticated
   using (bucket_id in ('videos','media','avatars','sounds') and public.bp_is_admin());
+
+-- 15. Original sounds: a video's own sound can be shared as an MP3 that others can use
+alter table public.bp_videos add column if not exists sound_id uuid references public.bp_sounds(id) on delete set null;
+create index if not exists bp_videos_sound_idx on public.bp_videos (sound_id);
