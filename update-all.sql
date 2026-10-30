@@ -480,3 +480,48 @@ drop trigger if exists bp_push_notes_t on public.bp_notifications;
 create trigger bp_push_notes_t after insert on public.bp_notifications for each row execute function public.bp_push_notify();
 drop trigger if exists bp_push_msgs_t on public.bp_messages;
 create trigger bp_push_msgs_t after insert on public.bp_messages for each row execute function public.bp_push_notify();
+
+-- 14. Editor: Blueprint Sounds library and music attached to posts
+alter table public.bp_videos
+  add column if not exists music_url text,
+  add column if not exists music_credit text,
+  add column if not exists music_vol real not null default 0.8 check (music_vol between 0 and 1),
+  add column if not exists orig_vol real not null default 1 check (orig_vol between 0 and 1),
+  add column if not exists music_start real not null default 0 check (music_start >= 0);
+
+create table if not exists public.bp_sounds (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  title text not null check (char_length(title) between 1 and 80),
+  artist text not null check (char_length(artist) between 1 and 60),
+  genre text not null default 'Other',
+  audio_path text not null,
+  duration_s int,
+  allow_use boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists bp_sounds_new_idx on public.bp_sounds (created_at desc);
+alter table public.bp_sounds enable row level security;
+drop policy if exists "sounds read" on public.bp_sounds;
+drop policy if exists "sounds add own" on public.bp_sounds;
+drop policy if exists "sounds delete own" on public.bp_sounds;
+drop policy if exists "sounds admin delete" on public.bp_sounds;
+create policy "sounds read" on public.bp_sounds for select using (allow_use or user_id = (select auth.uid()));
+create policy "sounds add own" on public.bp_sounds for insert to authenticated with check (user_id = (select auth.uid()) and public.bp_ok());
+create policy "sounds delete own" on public.bp_sounds for delete to authenticated using (user_id = (select auth.uid()));
+create policy "sounds admin delete" on public.bp_sounds for delete to authenticated using (public.bp_is_admin());
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('sounds', 'sounds', true, 15728640, array['audio/*'])
+on conflict (id) do update set file_size_limit = 15728640, allowed_mime_types = array['audio/*'];
+drop policy if exists "bp sounds read" on storage.objects;
+drop policy if exists "bp sounds insert own" on storage.objects;
+drop policy if exists "bp sounds delete own" on storage.objects;
+create policy "bp sounds read" on storage.objects for select using (bucket_id = 'sounds');
+create policy "bp sounds insert own" on storage.objects for insert to authenticated
+  with check (bucket_id = 'sounds' and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy "bp sounds delete own" on storage.objects for delete to authenticated
+  using (bucket_id = 'sounds' and (storage.foldername(name))[1] = (select auth.uid())::text);
+drop policy if exists "bp admin delete files" on storage.objects;
+create policy "bp admin delete files" on storage.objects for delete to authenticated
+  using (bucket_id in ('videos','media','avatars','sounds') and public.bp_is_admin());

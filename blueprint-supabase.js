@@ -49,6 +49,8 @@
         post.imgs = (v.image_paths || []).map(x => pub('media', x));
         if (v.music_path) { post.music = pub('media', v.music_path); post.mt = v.music_title || 'Music'; }
       } else post.src = pub('videos', v.video_path);
+      if (v.music_url) { post.music = v.music_url; post.mt = v.music_title || 'Sound'; post.mc = String(v.music_credit || '').replace(/[<>&"']/g, ''); }
+      post.mv = v.music_vol ?? 0.8; post.ov = v.orig_vol ?? 1; post.ms = v.music_start || 0;
       post.files = v.kind === 'photo' ? [...(v.image_paths || []).map(x => ['media', x]), ...(v.music_path ? [['media', v.music_path]] : [])] : [['videos', v.video_path]];
       return post;
     });
@@ -105,7 +107,8 @@
   }
 
   // Photo slideshows and music
-  window.slideHtml = p => `<div class="slides">${p.imgs.map((u, i) => `<img src="${u}" alt="" class="${i ? '' : 'on'}">`).join('')}</div>${p.music ? `<button class="mu" data-a="mu" data-src="${p.music}">♪ ${String(p.mt || 'Music').replace(/[<>&"']/g, '')}</button>` : ''}`;
+  window.musicBtn = p => `<button class="mu" data-a="mu" data-src="${p.music}" data-vol="${p.mv ?? 1}" data-start="${p.ms || 0}">♪ ${String(p.mt || 'Music').replace(/[<>&"']/g, '')}</button>`;
+  window.slideHtml = p => `<div class="slides">${p.imgs.map((u, i) => `<img src="${u}" alt="" class="${i ? '' : 'on'}">`).join('')}</div>${p.music ? musicBtn(p) : ''}`;
   setInterval(() => { $$('.slides').forEach(s => { const im = [...s.children]; if (im.length < 2) return; const i = im.findIndex(x => x.classList.contains('on')); im[i].classList.remove('on'); im[(i + 1) % im.length].classList.add('on'); }); }, 4000);
   // Sound and music autoplay are handled in blueprint-sound.js
 
@@ -178,7 +181,7 @@
     return { title: $('#ut').value.trim() || 'Untitled', caption: d, tags: (d.match(/#\w+/g) || []).map(x => x.slice(1)), steps: steps.length ? steps : null, allow_download: $('#adl') ? $('#adl').checked : true };
   };
   const finish = async () => {
-    pending = null; ['#file', '#pimg', '#pmus'].forEach(i => { $(i).value = ''; }); $('#ut').value = ''; $('#ud').value = ''; $('#umsg').textContent = '';
+    if (window.BPEdit) window.BPEdit.clear(); pending = null; ['#file', '#pimg', '#pmus'].forEach(i => { $(i).value = ''; }); $('#ut').value = ''; $('#ud').value = ''; $('#umsg').textContent = '';
     busy = false; $('#post').disabled = false; $('#up').classList.remove('on');
     await load(); show('feed'); $('#feed').scrollTop = 0; note('Posted! It is in the feed and on your profile.', true);
   };
@@ -196,27 +199,28 @@
     const start = t => { busy = true; $('#post').disabled = true; m.className = 'msg'; m.textContent = t; };
 
     if (mode === 'photo') {
-      const imgs = [...$('#pimg').files].slice(0, 10), mus = $('#pmus').files[0];
+      const EP = window.BPEdit && window.BPEdit.photos, imgs = EP ? EP.blobs : [...$('#pimg').files].slice(0, 10), mus = (EP && EP.musicFile) || $('#pmus').files[0];
       if (!imgs.length) return fail('Choose 1 to 10 photos.');
       if (mus && mus.size > 15 * 1048576) return fail('The music file is over 15 MB.');
       start('Uploading… keep this page open.');
       try {
         await ensureProfile();
         const ip = []; let i = 0;
-        for (const f of imgs) ip.push(await up('media', await toJpeg(f), (i++) + '.jpg', 'image/jpeg'));
+        for (const f of imgs) ip.push(await up('media', (EP ? f : await toJpeg(f)), (i++) + '.jpg', 'image/jpeg'));
         const mp = mus ? await up('media', mus, 'music-' + mus.name.replace(/[^\w.-]/g, '_'), mus.type || 'audio/mpeg') : null;
-        const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'photo', image_paths: ip, music_path: mp, music_title: mus ? mus.name.replace(/\.[^.]+$/, '') : null, duration_s: Math.max(1, ip.length * 5) });
+        const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'photo', image_paths: ip, music_path: mp, music_title: mus ? mus.name.replace(/\.[^.]+$/, '') : null, duration_s: Math.max(1, ip.length * 5), ...(EP && EP.music ? EP.music : {}) });
         if (r.error) throw r.error;
       } catch (e) { await undo(); return fail(e.message || 'Upload failed. Try again.'); }
       return finish();
     }
 
-    const f = $('#file').files[0];
-    if (!f) return fail('Choose a video first.');
-    if (!pending) return fail('Still reading the video. Wait a second and tap Post again, or choose a different file.');
-    let file = f, type = f.type || 'video/mp4';
+    const f0 = $('#file').files[0], ED = window.BPEdit && window.BPEdit.video;
+    if (!f0 && !ED) return fail('Choose a video first.');
+    if (!pending && !ED) return fail('Still reading the video. Wait a second and tap Post again, or choose a different file.');
+    const f = ED ? ED.blob : f0, fname = ED ? 'edited.' + (ED.type.includes('mp4') ? 'mp4' : 'webm') : f0.name, dsec = ED ? ED.duration : pending.d;
+    let file = f, type = ED ? ED.type : (f.type || 'video/mp4');
     const over = f.size > MAXMB * 1048576, mb = (f.size / 1048576).toFixed(0);
-    if (over && !(window.BPUpload && confirm(`This video is ${mb} MB and the limit is ${MAXMB} MB.\n\nCompress it now? This takes about as long as the video itself (${fmt(pending.d)}), and you need to keep this page open.`)))
+    if (over && !(window.BPUpload && confirm(`This video is ${mb} MB and the limit is ${MAXMB} MB.\n\nCompress it now? This takes about as long as the video itself (${fmt(dsec)}), and you need to keep this page open.`)))
       return fail(`This video is ${mb} MB. The limit is ${MAXMB} MB. Trim or compress it and try again.`);
     start('Preparing…');
     try {
@@ -228,9 +232,9 @@
       }
       await ensureProfile();
       m.textContent = 'Uploading… 0%';
-      const ext = over ? (type.includes('mp4') ? 'mp4' : 'webm') : (f.name.split('.').pop() || 'mp4');
-      const path = await up('videos', file, (f.name.replace(/\.[^.]+$/, '') + '.' + ext).replace(/[^\w.-]/g, '_'), type, pc => { m.textContent = 'Uploading… ' + pc + '%'; });
-      const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'video', video_path: path, duration_s: pending.d });
+      const ext = over ? (type.includes('mp4') ? 'mp4' : 'webm') : (fname.split('.').pop() || 'mp4');
+      const path = await up('videos', file, (fname.replace(/\.[^.]+$/, '') + '.' + ext).replace(/[^\w.-]/g, '_'), type, pc => { m.textContent = 'Uploading… ' + pc + '%'; });
+      const r = await sb.from('bp_videos').insert({ ...meta(), kind: 'video', video_path: path, duration_s: dsec, ...(ED && ED.music ? ED.music : {}) });
       if (r.error) throw r.error;
     } catch (e) { await undo(); return fail(e.message || 'Upload failed. Try again.'); }
     finish();

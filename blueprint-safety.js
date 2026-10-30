@@ -48,7 +48,7 @@
   $('#delb').onclick = async () => {
     if (prompt('This permanently deletes your account, posts, messages and followers. Type DELETE to confirm.') !== 'DELETE') return;
     const uid = me().id; BP.note('Deleting…', true);
-    for (const b of ['videos', 'media', 'avatars']) {
+    for (const b of ['videos', 'media', 'avatars', 'sounds']) {
       const l = await sb.storage.from(b).list(uid, { limit: 1000 }), names = (l.data || []).map(x => uid + '/' + x.name);
       if (names.length) await sb.storage.from(b).remove(names);
     }
@@ -92,11 +92,11 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
   $('#hcb').onclick = async () => {
     $('#hc').classList.add('on'); const box = $('#hcl'); box.innerHTML = 'Checking…';
     const out = [], add = (name, res) => out.push([name, res]);
-    const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins', 'bp_notif_prefs', 'bp_push_subs'];
+    const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins', 'bp_notif_prefs', 'bp_push_subs', 'bp_sounds'];
     for (const t of tables) { const r = await sb.from(t).select('*', { count: 'exact', head: true }); add('Table ' + t, r.error ? r.error.message : true); }
-    const cols = [['bp_videos', 'kind,image_paths,music_path,music_title,allow_download'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
+    const cols = [['bp_videos', 'kind,image_paths,music_path,music_title,allow_download,music_url,music_credit,music_vol,orig_vol,music_start'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
     for (const [t, c] of cols) { const r = await sb.from(t).select(c).limit(1); add(`Columns in ${t}`, r.error ? r.error.message : true); }
-    for (const b of ['videos', 'media', 'avatars']) { const r = await sb.storage.from(b).list('', { limit: 1 }); add('Storage bucket ' + b, r.error ? r.error.message : true); }
+    for (const b of ['videos', 'media', 'avatars', 'sounds']) { const r = await sb.storage.from(b).list('', { limit: 1 }); add('Storage bucket ' + b, r.error ? r.error.message : true); }
     if (me()) {
       const a = await sb.rpc('bp_can_message', { s: me().id, r: me().id }); add('Messaging rules function', a.error ? a.error.message : true);
       const s = await sb.rpc('bp_stats', { ids: [] }); add('Feed ranking function', s.error ? s.error.message : true);
@@ -107,6 +107,7 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
     add('Browser: recording replays', window.MediaRecorder ? true : 'No MediaRecorder. Replays and compression won’t work.');
     add('Resumable uploads loaded', window.tus ? true : 'tus library missing. Large uploads use the basic method.');
     add('Phone alerts key (vapidKey in config.js)', C.vapidKey ? true : 'Not set. Phone alerts stay off.');
+    add('Free music search (jamendoId in config.js)', C.jamendoId ? true : 'Not set. Only Blueprint Sounds are available.');
     add('Live relay (TURN) set up', C.iceServers && C.iceServers.some(x => String(x.urls).startsWith('turn')) ? true : 'Not set. Some mobile networks will fail to connect to lives.');
     const bad = out.filter(x => x[1] !== true);
     box.innerHTML = `<p><b>${bad.length ? bad.length + ' issue' + (bad.length > 1 ? 's' : '') + ' found' : 'Everything looks good'}</b></p>` + out.map(([n, r]) => `<div style='padding:3px 0;color:${r === true ? 'inherit' : '#e5484d'}'>${r === true ? '✓' : '✗'} ${esc(n)}${r === true ? '' : '<br><small>' + esc(r) + '</small>'}</div>`).join('') + (bad.length ? "<p style='color:var(--mut)'>Most ✗ lines about tables, columns or functions mean update-all.sql still needs to be run.</p>" : '');

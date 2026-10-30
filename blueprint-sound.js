@@ -22,7 +22,7 @@
       if (cur && cur.contains(v)) {
         wantsSound = true;
         if (!sound || needTap) v.muted = true;
-        else if (v.dataset.u !== '1') { v.muted = false; v.dataset.u = '1'; }
+        else if (v.dataset.u !== '1') { v.muted = false; v.dataset.u = '1'; v.volume = Math.min(1, +(v.dataset.vol || 1)); }
         if (v.paused && v.dataset.up !== '1') v.play().catch(() => { if (!v.muted) { v.muted = true; v.dataset.u = ''; needTap = true; v.play().catch(() => {}); } });
       } else { v.dataset.up = ''; v.closest('.post')?.classList.remove('paused'); if (!v.paused) v.pause(); }
     });
@@ -31,8 +31,9 @@
     if (mu) {
       wantsSound = true;
       if (off && off !== mu.dataset.src) off = null;
-      if (sound && !needTap && off !== mu.dataset.src) {
-        if (au.src !== mu.dataset.src) au.src = mu.dataset.src;
+      if (sound && !needTap && off !== mu.dataset.src && !(cur.querySelector('video')?.dataset.up === '1')) {
+        if (au.src !== mu.dataset.src) { au.src = mu.dataset.src; const st = +(mu.dataset.start || 0); if (st) au.addEventListener('loadedmetadata', () => { au.currentTime = st; }, { once: true }); }
+        au.volume = Math.min(1, +(mu.dataset.vol || 1));
         if (au.paused) au.play().catch(() => { needTap = true; });
       }
       mu.classList.toggle('on', !au.paused && au.src === mu.dataset.src);
@@ -65,7 +66,7 @@
     const v = e.target; if (v.tagName !== 'VIDEO' || justOn) return;
     const post = v.closest('.post');
     if (v.paused) { v.dataset.up = ''; post.classList.remove('paused'); v.play().catch(() => {}); }
-    else { v.pause(); v.dataset.up = '1'; post.classList.add('paused'); }
+    else { v.pause(); v.dataset.up = '1'; post.classList.add('paused'); au.pause(); }
   });
   let seeking = null;
   const seek = e => { const r = seeking.b.getBoundingClientRect(); seeking.v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * seeking.v.duration; };

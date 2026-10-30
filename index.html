@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="bp-version" content="20261030b">
+<meta name="bp-version" content="20261030c">
 <meta name="theme-color" content="#1e6bff">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
@@ -149,13 +149,13 @@ const ic={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-
 function visible(){let r=P.slice();if(tab==="follow")r=window.BP?r.filter(p=>p.uid&&followed.has(p.uid)):r.filter((p,i)=>i%2===0);if($("#fam").checked)r=r.filter(p=>!p.tag.includes("fitness"));return r}
 function renderFeed(){
  $("#feed").innerHTML=visible().map(p=>`<article class="post" data-id="${p.id}" style="background:${G[p.g%5]}">
- ${p.imgs?slideHtml(p):p.src?`<video src="${p.src}" loop muted playsinline></video>`:`<div class="big">▶<br>${p.t}</div>`}
+ ${p.imgs?slideHtml(p):p.src?`<video src="${p.src}" loop muted playsinline data-vol="${p.ov??1}"></video>${p.music?musicBtn(p):""}`:`<div class="big">▶<br>${p.t}</div>`}
  <div class="rail">${p.uid&&(!window.BP||!window.BP.me||window.BP.me.id!==p.uid)?`<button class="fw ${followed.has(p.uid)?"on":""}" data-a="follow">${followed.has(p.uid)?"✓":"+"}<span>${followed.has(p.uid)?"Following":"Follow"}</span></button>`:""}
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
  <button data-a="sh">${ic.s}<span>Share</span></button>${p.src||p.imgs?(p.dl===false&&!(window.BP&&window.BP.me&&window.BP.me.id===p.uid)?"":`<button data-a="dl">⬇<span>Download</span></button>`):""}${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}</div>
- <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3><p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
+ <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.mc?`<p style="font-size:11px;opacity:.85">♪ ${p.mc}</p>`:""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
 function renderGrid(){
@@ -298,19 +298,30 @@ $('#cp').onclick=async e=>{
 };
 renderFeed();
 </script>
-<script src="config.js?v=20261030b"></script>
+<script>
+addEventListener('error', function (e) {
+  var f = e.filename || ''; if (!/config\.js|blueprint-[a-z]+\.js/.test(f)) return;
+  var b = document.getElementById('bperr') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'bperr' }));
+  b.style.cssText = 'position:fixed;left:8px;right:8px;top:calc(8px + env(safe-area-inset-top,0px));z-index:99;background:#e5484d;color:#fff;border-radius:12px;padding:10px 14px;font-size:13px';
+  b.textContent = (/config\.js/.test(f) ? 'config.js has a mistake (check commas and quotes). The app is in demo mode. ' : 'A part of Blueprint failed: ' + f.split('/').pop().split('?')[0] + '. ') + (e.message || '') + ' (tap to hide)';
+  b.onclick = function () { b.remove(); };
+});
+</script>
+<script src="config.js?v=20261030c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="blueprint-supabase.js?v=20261030b"></script>
-<script src="blueprint-profile.js?v=20261030b"></script>
-<script src="blueprint-extra.js?v=20261030b"></script>
-<script src="blueprint-messages.js?v=20261030b"></script>
-<script src="blueprint-sound.js?v=20261030b"></script>
+<script src="blueprint-supabase.js?v=20261030c"></script>
+<script src="blueprint-profile.js?v=20261030c"></script>
+<script src="blueprint-extra.js?v=20261030c"></script>
+<script src="blueprint-messages.js?v=20261030c"></script>
+<script src="blueprint-sound.js?v=20261030c"></script>
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.1.0/dist/tus.min.js"></script>
-<script src="blueprint-upload.js?v=20261030b"></script>
-<script src="blueprint-feed.js?v=20261030b"></script>
-<script src="blueprint-safety.js?v=20261030b"></script>
-<script src="blueprint-settings.js?v=20261030b"></script>
-<script src="blueprint-install.js?v=20261030b"></script>
-<script src="blueprint-notify.js?v=20261030b"></script>
+<script src="blueprint-upload.js?v=20261030c"></script>
+<script src="blueprint-feed.js?v=20261030c"></script>
+<script src="blueprint-safety.js?v=20261030c"></script>
+<script src="blueprint-settings.js?v=20261030c"></script>
+<script src="blueprint-install.js?v=20261030c"></script>
+<script src="blueprint-notify.js?v=20261030c"></script>
+<script src="blueprint-sounds.js?v=20261030c"></script>
+<script src="blueprint-editor.js?v=20261030c"></script>
 </body>
 </html>
