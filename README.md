@@ -37,7 +37,7 @@ TURN relays are sold by services such as Metered, Twilio or Cloudflare, or you c
 
 ## Install as an app (PWA)
 Open the site on a phone: Android Chrome offers Install app; on iPhone use Safari > Share > Add to Home Screen. Me > Settings > Account and help has an Install button too.
-When you release an update, change the version number (20261030d) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
+When you release an update, change the version number (20261030e) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
 Store listings later: Android via PWABuilder or Bubblewrap (Google Play developer account), iPhone via a Capacitor wrapper (Apple Developer account and App Review; user-generated content apps need reporting, blocking and moderation, which Blueprint has).
 
 ## Phone alerts (push) setup
@@ -73,3 +73,5 @@ If config.js has a mistake the app falls back to demo mode (no real videos or pr
 ## Original sounds and Explore previews
 - When posting a video, "Let others use this video's sound" (on by default) turns its audio into an MP3 (videos up to 3 minutes, silent videos are skipped). The sound appears under the post with a ♪ line; tapping it opens Use this sound, Preview and Download MP3.
 - Explore tiles show a picture and play a muted preview of the first 3 seconds while visible (a still picture only if the phone has Data Saver on).
+
+- Every video shows its sound: a moving ♪ line at the bottom and a spinning disc on the right. Tap either to open the Sound page (how many videos use it, preview, Use this sound, Download MP3). Great for sound challenges.

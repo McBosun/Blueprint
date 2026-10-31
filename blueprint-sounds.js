@@ -86,24 +86,35 @@
     m.className = 'msg ok'; m.textContent = 'Added. People can now use your sound.'; setTimeout(() => { tab = 'mine'; draw(); }, 900);
   }
 
-  // ---------- "Use this sound" sheet (opened from a post's ♪ line) ----------
-  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='sdt'><div><h2 id='sdh'>Sound</h2><div id='sdb' style='font-size:14px;margin-bottom:10px;color:var(--mut)'></div><div style='display:flex;gap:8px'><button class='btn alt' id='sdp' style='margin:0'>▶ Preview</button><button class='btn' id='sdu' style='margin:0'>Use this sound</button></div><button class='btn alt' id='sdd' hidden>Download MP3</button><button class='btn alt' id='sdx'>Close</button></div></div>");
-  let cur = null; const sd = document.getElementById.bind(document);
-  const sclose = () => { prev.pause(); sd('sdt').classList.remove('on'); };
-  window.BPSounds.detail = s => {
-    cur = s; sd('sdh').textContent = s.title || 'Sound'; sd('sdb').textContent = s.credit || ''; sd('sdp').textContent = '▶ Preview';
-    const own = /\/storage\/v1\/object\/public\/sounds\//.test(s.url); sd('sdd').hidden = !own;
-    if (own) sd('sdd').dataset.url = s.url + '?download=' + encodeURIComponent((s.title || 'sound').replace(/[^\w-]+/g, '_') + '.mp3');
-    sd('sdt').classList.add('on');
+  // ---------- Sound page: who uses this sound, and everyone can reuse it ----------
+  document.body.insertAdjacentHTML('beforeend', "<div class='ovp' id='spg' style='z-index:61'></div>");
+  const pg = document.getElementById('spg'); let cur = null;
+  const pclose = () => { prev.pause(); pg.classList.remove('on'); };
+  window.BPSounds.detail = async s => {
+    cur = s; pg.classList.add('on');
+    const m = s.url.match(/\/storage\/v1\/object\/public\/sounds\/(.+)$/), own = !!m;
+    pg.innerHTML = `<div style='padding:8px 12px'><button class='btn alt' id='spx' style='width:auto;margin:0'>‹ Back</button></div>
+<div style='text-align:center;padding:8px 16px'><div class='disc' style='margin:0 auto 10px;width:84px;height:84px;font-size:34px;cursor:default'>♪</div><h2 style='margin:0'>${esc(s.title || 'Sound')}</h2><div style='color:var(--mut);font-size:13px;margin-top:4px'>${esc(s.credit || '')}</div><div id='spc' style='margin-top:6px;font-size:13px'>Loading…</div></div>
+<div class='pb'><button class='btn alt' id='spp'>▶ Preview</button><button class='btn' id='spu'>Use this sound</button></div>${own ? "<div class='pb' style='padding-top:0'><button class='btn alt' id='spd'>Download MP3</button></div>" : ''}<div class='pg' id='spl'></div>`;
+    if (own && !s.sid) { const r = await sb.from('bp_sounds').select('id').eq('audio_path', decodeURIComponent(m[1].split('?')[0])).maybeSingle(); if (r.data) s.sid = r.data.id; }
+    const base = sb.from('bp_videos').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(60);
+    const { data, count } = await (s.sid ? base.or(`sound_id.eq.${s.sid},music_url.eq."${s.url}"`) : base.eq('music_url', s.url));
+    const posts = await BP.build(data || []), n = count || 0, c = document.getElementById('spc'); if (!c || cur !== s) return;
+    c.textContent = n === 0 ? 'Be the first to use this sound!' : n === 1 ? '1 video uses this sound' : n + ' videos use this sound';
+    document.getElementById('spl').innerHTML = posts.map(p => `<div data-id='${esc(p.id)}' style='background:${G[p.g % 5]}'>${typeof tileMedia === 'function' ? tileMedia(p) : ''}<span style='position:relative'>${esc(p.t)}</span></div>`).join('');
   };
-  sd('sdx').onclick = sclose;
-  sd('sdp').onclick = () => { if (prev.src === cur.url && !prev.paused) { prev.pause(); sd('sdp').textContent = '▶ Preview'; } else { prev.src = cur.url; prev.play().catch(() => BP.note('Couldn’t play this sound.')); sd('sdp').textContent = '❚❚ Pause'; } };
-  sd('sdd').onclick = () => { const a = document.createElement('a'); a.href = sd('sdd').dataset.url; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); };
-  sd('sdu').onclick = () => {
-    if (!me()) { sclose(); return BP.openAuth(); }
-    window.BPEdit = window.BPEdit || {}; window.BPEdit.sound = { url: cur.url, title: cur.title, credit: cur.credit || '' };
-    sclose(); document.getElementById('up').classList.add('on'); if (window.BPEdit.refresh) window.BPEdit.refresh();
-    BP.note('Sound ready. Choose a video or photos, then tap Edit to adjust it.', true);
+  pg.onclick = e => {
+    const id = e.target.id, tile = e.target.closest('#spl [data-id]');
+    if (id === 'spx') return pclose();
+    if (id === 'spp') { if (prev.src === cur.url && !prev.paused) { prev.pause(); e.target.textContent = '▶ Preview'; } else { prev.src = cur.url; prev.play().catch(() => BP.note('Couldn’t play this sound.')); e.target.textContent = '❚❚ Pause'; } }
+    if (id === 'spd') { const m = cur.url.match(/\/public\/sounds\/.+$/), a = document.createElement('a'); a.href = cur.url.split('?')[0] + '?download=' + encodeURIComponent((cur.title || 'sound').replace(/[^\w-]+/g, '_') + '.mp3'); a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+    if (id === 'spu') {
+      if (!me()) { pclose(); return BP.openAuth(); }
+      window.BPEdit = window.BPEdit || {}; window.BPEdit.sound = { url: cur.url, title: cur.title, credit: cur.credit || '' };
+      pclose(); document.getElementById('up').classList.add('on'); if (window.BPEdit.refresh) window.BPEdit.refresh();
+      BP.note('Sound ready. Choose a video or photos, then tap Edit to adjust it.', true);
+    }
+    if (tile) { pclose(); BP.openPost(tile.dataset.id); }
   };
-  document.getElementById('feed').addEventListener('click', e => { const t = e.target.closest('.snd'); if (t && t.dataset.su) window.BPSounds.detail({ url: t.dataset.su, title: t.dataset.st, credit: t.dataset.sc }); });
+  document.getElementById('feed').addEventListener('click', e => { const t = e.target.closest('.snd'); if (t && t.dataset.su) window.BPSounds.detail({ url: t.dataset.su, title: t.dataset.st, credit: t.dataset.sc, sid: t.dataset.sid || null }); });
 })();

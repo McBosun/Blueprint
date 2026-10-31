@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="bp-version" content="20261030d">
+<meta name="bp-version" content="20261030e">
 <meta name="theme-color" content="#1e6bff">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
@@ -86,6 +86,9 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 .rc,.dc{color:var(--mut);font-size:11px;margin-left:6px;cursor:pointer;text-decoration:underline}
 .bar{height:18px;background:linear-gradient(transparent 15px,rgba(255,255,255,.25) 15px);touch-action:none;cursor:pointer}.bar i{height:3px;margin-top:15px}
 .post.paused::after{content:"▶";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:64px;color:#fff;opacity:.8;pointer-events:none;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.sndrow{display:flex;overflow:hidden;max-width:64%;margin:6px 0 2px;font-size:13px;white-space:nowrap;cursor:pointer}.sndrow .mq{display:inline-block;padding-left:100%;animation:mq 11s linear infinite}@keyframes mq{to{transform:translateX(-100%)}}
+.disc{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#1e6bff 0 22%,#161616 24% 100%);border:2px solid #444;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;cursor:pointer;animation:spin 5s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.post.paused .disc,.post.paused .mq{animation-play-state:paused}.snd:not([data-su]){cursor:default}
 </style>
 </head>
 <body>
@@ -144,6 +147,10 @@ let saved=new Set(),liked=new Set(),followed=new Set(),cur=null,tab="foryou";
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 const n=x=>x>=1000?(x/1000).toFixed(1).replace(".0","")+"K":x;
+const sndLabel=p=>p.music?p.mt:p.surl?p.sname:"Original audio \u00b7 "+p.u;
+const sndAttr=p=>p.music||p.surl?` data-su="${p.music||p.surl}" data-st="${sndLabel(p)}" data-sc="${p.mc||""}" data-sid="${p.sid||""}"`:"";
+const sndRow=p=>`<div class="sndrow snd"${sndAttr(p)}><span class="mq">\u266a ${sndLabel(p)}${p.mc?" \u00b7 "+p.mc:""}</span></div>`;
+const sndDisc=p=>`<div class="disc snd"${sndAttr(p)}>\u266a</div>`;
 const shareUrl=p=>typeof p.id==="string"?location.href.split("#")[0]+"#p-"+p.id:location.href.split("#")[0];
 const ic={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>',b:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 12v8h16v-8M12 3v13M7 8l5-5 5 5"/></svg>'};
 function visible(){let r=P.slice();if(tab==="follow")r=window.BP?r.filter(p=>p.uid&&followed.has(p.uid)):r.filter((p,i)=>i%2===0);if($("#fam").checked)r=r.filter(p=>!p.tag.includes("fitness"));return r}
@@ -154,8 +161,8 @@ function renderFeed(){
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
- <button data-a="sh">${ic.s}<span>Share</span></button>${p.src||p.imgs?(p.dl===false&&!(window.BP&&window.BP.me&&window.BP.me.id===p.uid)?"":`<button data-a="dl">⬇<span>Download</span></button>`):""}${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}</div>
- <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.music||p.surl?`<p class="snd" data-su="${p.music||p.surl}" data-st="${p.music?p.mt:p.sname}" data-sc="${p.mc||""}" style="font-size:12px;opacity:.92;cursor:pointer">♪ ${p.music?p.mt:p.sname}${p.mc?" · "+p.mc:""}</p>`:""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
+ <button data-a="sh">${ic.s}<span>Share</span></button>${p.src||p.imgs?(p.dl===false&&!(window.BP&&window.BP.me&&window.BP.me.id===p.uid)?"":`<button data-a="dl">⬇<span>Download</span></button>`):""}${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}${p.src||p.imgs?sndDisc(p):""}</div>
+ <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.src||p.imgs?sndRow(p):""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
 function renderGrid(){
@@ -307,24 +314,24 @@ addEventListener('error', function (e) {
   b.onclick = function () { b.remove(); };
 });
 </script>
-<script src="config.js?v=20261030d"></script>
+<script src="config.js?v=20261030e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="blueprint-supabase.js?v=20261030d"></script>
-<script src="blueprint-profile.js?v=20261030d"></script>
-<script src="blueprint-extra.js?v=20261030d"></script>
-<script src="blueprint-messages.js?v=20261030d"></script>
-<script src="blueprint-sound.js?v=20261030d"></script>
+<script src="blueprint-supabase.js?v=20261030e"></script>
+<script src="blueprint-profile.js?v=20261030e"></script>
+<script src="blueprint-extra.js?v=20261030e"></script>
+<script src="blueprint-messages.js?v=20261030e"></script>
+<script src="blueprint-sound.js?v=20261030e"></script>
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.1.0/dist/tus.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-<script src="blueprint-upload.js?v=20261030d"></script>
-<script src="blueprint-feed.js?v=20261030d"></script>
-<script src="blueprint-safety.js?v=20261030d"></script>
-<script src="blueprint-settings.js?v=20261030d"></script>
-<script src="blueprint-install.js?v=20261030d"></script>
-<script src="blueprint-notify.js?v=20261030d"></script>
-<script src="blueprint-sounds.js?v=20261030d"></script>
-<script src="blueprint-editor.js?v=20261030d"></script>
-<script src="blueprint-mp3.js?v=20261030d"></script>
-<script src="blueprint-explore.js?v=20261030d"></script>
+<script src="blueprint-upload.js?v=20261030e"></script>
+<script src="blueprint-feed.js?v=20261030e"></script>
+<script src="blueprint-safety.js?v=20261030e"></script>
+<script src="blueprint-settings.js?v=20261030e"></script>
+<script src="blueprint-install.js?v=20261030e"></script>
+<script src="blueprint-notify.js?v=20261030e"></script>
+<script src="blueprint-sounds.js?v=20261030e"></script>
+<script src="blueprint-editor.js?v=20261030e"></script>
+<script src="blueprint-mp3.js?v=20261030e"></script>
+<script src="blueprint-explore.js?v=20261030e"></script>
 </body>
 </html>
