@@ -1,5 +1,5 @@
 // Blueprint service worker. Network first, so updates always arrive; the cache is only a fallback for offline.
-const VERSION = '20261030e';
+const VERSION = '20261030f';
 const CACHE = 'blueprint-' + VERSION;
 const SHELL = ['./', 'index.html', 'terms.html', 'privacy.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 

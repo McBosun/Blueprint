@@ -37,7 +37,7 @@ TURN relays are sold by services such as Metered, Twilio or Cloudflare, or you c
 
 ## Install as an app (PWA)
 Open the site on a phone: Android Chrome offers Install app; on iPhone use Safari > Share > Add to Home Screen. Me > Settings > Account and help has an Install button too.
-When you release an update, change the version number (20261030e) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
+When you release an update, change the version number (20261030f) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
 Store listings later: Android via PWABuilder or Bubblewrap (Google Play developer account), iPhone via a Capacitor wrapper (Apple Developer account and App Review; user-generated content apps need reporting, blocking and moderation, which Blueprint has).
 
 ## Phone alerts (push) setup
@@ -75,3 +75,8 @@ If config.js has a mistake the app falls back to demo mode (no real videos or pr
 - Explore tiles show a picture and play a muted preview of the first 3 seconds while visible (a still picture only if the phone has Data Saver on).
 
 - Every video shows its sound: a moving ♪ line at the bottom and a spinning disc on the right. Tap either to open the Sound page (how many videos use it, preview, Use this sound, Download MP3). Great for sound challenges.
+
+## Accounts and passwords
+- Sign in and Create account are separate screens. Sign-up asks for full name, username, email, date of birth (private), country and interests (optional), password twice, and agreement to the terms. People under 18 must tick a parent or guardian box; under 16 cannot join (change `minAge` in config.js to adjust the client check, and the 16 in section 16 of update-all.sql).
+- Forgot password sends an email link that comes back to your site and asks for a new password. In Supabase > Authentication > URL Configuration, your site URL must be in Redirect URLs.
+- Supabase's built-in email sender has a very small hourly limit. Before real users arrive, add your own email service (Authentication > SMTP Settings) with Resend, Brevo or similar, so confirmation and reset emails are not blocked.

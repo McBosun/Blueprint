@@ -5,28 +5,94 @@
   const sb = supabase.createClient(C.url, C.key);
   const MAXMB = C.maxMB || 50;
   let me = (await sb.auth.getSession()).data.session?.user || null;
-  sb.auth.onAuthStateChange((_e, s) => { me = s?.user || null; });
-  window.BP = { sb, get me() { return me; }, openAuth: () => $('#au').classList.add('on'), load: () => load(), loadComments: p => loadComments(p) };
+  sb.auth.onAuthStateChange((e, s) => { me = s?.user || null; if (e === 'PASSWORD_RECOVERY') setTimeout(() => showAuth('reset'), 250); });
+  window.BP = { sb, get me() { return me; }, openAuth: m => showAuth(m), load: () => load(), loadComments: p => loadComments(p) };
 
   // Message banner
   document.body.insertAdjacentHTML('beforeend', "<div id='bpn' style='position:fixed;left:12px;right:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:30;color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;display:none'></div>");
   const note = (t, ok) => { const el = $('#bpn'); el.style.background = ok ? '#1a9e5a' : '#e5484d'; el.textContent = t; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 7000); };
 
-  // Sign in sheet
-  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='au'><div><h2>Welcome to Blueprint</h2><input id='ae' type='email' placeholder='Email'><input id='ap' type='password' placeholder='Password (6+ characters)'><label style='font-size:12px;display:flex;gap:8px;align-items:flex-start;margin:6px 0'><input type='checkbox' id='aterms' style='width:auto;margin-top:2px'><span>I’m at least 16 years old (if I’m under 18, my parent or guardian agrees) and I agree to the <a href='terms.html' target='_blank'>Terms and Rules</a> and <a href='privacy.html' target='_blank'>Privacy Policy</a> (needed to create an account).</span></label><div class='msg' id='am'></div><button class='btn' id='asi'>Sign in</button><button class='btn alt' id='asu'>Create account</button><button class='btn alt' id='ax'>Close</button></div></div>");
-  const openAuth = () => $('#au').classList.add('on');
-  $('#ax').onclick = () => $('#au').classList.remove('on');
-  async function auth(kind) {
-    const m = $('#am'); m.className = 'msg'; m.textContent = 'One moment…';
-    const cred = { email: $('#ae').value.trim(), password: $('#ap').value };
-    if (kind === 'up' && !$('#aterms').checked) { m.className = 'msg err'; m.textContent = 'Please confirm your age and agree to the Terms to create an account.'; return; }
-    const r = kind === 'in' ? await sb.auth.signInWithPassword(cred) : await sb.auth.signUp({ ...cred, options: { data: { terms: true } } });
-    if (r.error) { m.className = 'msg err'; m.textContent = r.error.message; return; }
-    if (!r.data.session) { m.className = 'msg ok'; m.textContent = 'Check your email to confirm, then sign in.'; return; }
-    me = r.data.user; $('#au').classList.remove('on'); m.textContent = ''; load();
+  // ---------- Sign in, create account, forgot password, new password ----------
+  const COUNTRIES = ['', 'Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Cameroon', 'Senegal', 'Ivory Coast', 'Uganda', 'Tanzania', 'United Kingdom', 'United States', 'Canada', 'Other'];
+  const TAGS = ['Music', 'Comedy', 'Food', 'Fashion', 'Sports', 'Education', 'Travel', 'Gaming', 'Tech', 'Faith', 'Business', 'Art'];
+  document.body.insertAdjacentHTML('beforeend', "<div class='sheet' id='au'><div id='aub'></div></div>");
+  const aub = $('#aub'), back = () => location.origin + location.pathname, picked = new Set();
+  const say = (t, ok) => { const m = $('#am'); if (m) { m.className = 'msg ' + (ok ? 'ok' : 'err'); m.textContent = t; } };
+  const ageOf = d => { const b = new Date(d), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; };
+  const lnk = (v, t) => `<a data-v='${v}' style='color:var(--blue);cursor:pointer;text-decoration:underline'>${t}</a>`;
+  const closeBtn = "<button class='btn alt' data-v='close'>Close</button>";
+  function showAuth(v) {
+    v = ['up', 'forgot', 'reset'].includes(v) ? v : 'in'; $('#au').classList.add('on'); picked.clear();
+    if (v === 'in') aub.innerHTML = `<h2>Sign in</h2><input id='ae' type='email' autocomplete='email' placeholder='Email'><input id='ap' type='password' autocomplete='current-password' placeholder='Password'><div class='msg' id='am'></div><button class='btn' id='go' data-k='in'>Sign in</button><div style='display:flex;justify-content:space-between;font-size:13px;margin:10px 2px'>${lnk('forgot', 'Forgot password?')}${lnk('up', 'New here? Create an account')}</div>${closeBtn}`;
+    if (v === 'forgot') aub.innerHTML = `<h2>Forgot password</h2><p style='font-size:14px;color:var(--mut)'>Enter your email and we’ll send you a link to choose a new password.</p><input id='ae' type='email' autocomplete='email' placeholder='Email'><div class='msg' id='am'></div><button class='btn' id='go' data-k='forgot'>Send reset link</button><div style='font-size:13px;margin:10px 2px'>${lnk('in', '‹ Back to sign in')}</div>${closeBtn}`;
+    if (v === 'reset') aub.innerHTML = `<h2>Choose a new password</h2><input id='ap' type='password' autocomplete='new-password' placeholder='New password (8+ characters, letters and numbers)'><input id='ap2' type='password' autocomplete='new-password' placeholder='Repeat new password'><div class='msg' id='am'></div><button class='btn' id='go' data-k='reset'>Save new password</button>`;
+    if (v === 'up') aub.innerHTML = `<h2>Create your account</h2>
+<input id='sn' maxlength='30' autocomplete='name' placeholder='Full name'>
+<input id='su' maxlength='20' autocomplete='username' autocapitalize='none' placeholder='Username (letters, numbers, _ and .)'><div id='sus' style='font-size:12px;min-height:16px'></div>
+<input id='ae' type='email' autocomplete='email' placeholder='Email'>
+<label style='font-size:12px;color:var(--mut)'>Date of birth (private, used only to check your age)</label><input id='sd' type='date' max='${new Date().toISOString().slice(0, 10)}'>
+<label style='font-size:12px;color:var(--mut)'>Country (optional)</label><select id='sc' style='width:100%;padding:10px;border-radius:10px;background:var(--card);color:var(--fg);border:1px solid var(--line);margin:6px 0'>${COUNTRIES.map(c => `<option value='${c}'>${c || 'Choose…'}</option>`).join('')}</select>
+<label style='font-size:12px;color:var(--mut)'>Pick up to 3 interests (optional)</label><div style='margin:6px 0'>${TAGS.map(t => `<span class='pill' data-t='${t}' style='cursor:pointer'>${t}</span>`).join('')}</div>
+<input id='ap' type='password' autocomplete='new-password' placeholder='Password (8+ characters, letters and numbers)'><input id='ap2' type='password' autocomplete='new-password' placeholder='Repeat password'>
+<label id='spw' hidden style='font-size:12px;display:flex;gap:8px;align-items:flex-start;margin:6px 0'><input type='checkbox' id='spar' style='width:auto;margin-top:2px'><span>My parent or guardian knows I’m joining Blueprint and agrees.</span></label>
+<label style='font-size:12px;display:flex;gap:8px;align-items:flex-start;margin:6px 0'><input type='checkbox' id='aterms' style='width:auto;margin-top:2px'><span>I agree to the <a href='terms.html' target='_blank'>Terms and Rules</a> and <a href='privacy.html' target='_blank'>Privacy Policy</a>.</span></label>
+<div class='msg' id='am'></div><button class='btn' id='go' data-k='up'>Create account</button><div style='font-size:13px;margin:10px 2px'>Already have an account? ${lnk('in', 'Sign in')}</div>${closeBtn}`;
   }
-  $('#asi').onclick = () => auth('in');
-  $('#asu').onclick = () => auth('up');
+  async function doIn() {
+    const email = $('#ae').value.trim(), password = $('#ap').value;
+    if (!email || !password) return say('Enter your email and password.');
+    say('One moment…', true);
+    const r = await sb.auth.signInWithPassword({ email, password });
+    if (r.error) return say(/invalid login/i.test(r.error.message) ? 'Wrong email or password.' : /not confirmed/i.test(r.error.message) ? 'Please confirm your email first. Check your inbox.' : r.error.message);
+    me = r.data.user; $('#au').classList.remove('on'); load(); note('Welcome back!', true);
+  }
+  async function doForgot() {
+    const email = $('#ae').value.trim(); if (!/^\S+@\S+\.\S+$/.test(email)) return say('Enter the email you signed up with.');
+    say('One moment…', true);
+    const r = await sb.auth.resetPasswordForEmail(email, { redirectTo: back() });
+    if (r.error && /rate|seconds|limit/i.test(r.error.message)) return say('Please wait a minute and try again.');
+    say('If that email has an account, a reset link is on its way. Check your inbox and spam folder.', true);
+  }
+  async function doReset() {
+    const pw = $('#ap').value; if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return say('Password: at least 8 characters with letters and numbers.');
+    if (pw !== $('#ap2').value) return say('The two passwords don’t match.');
+    const r = await sb.auth.updateUser({ password: pw });
+    if (r.error) return say(r.error.message);
+    say('Password changed. You are signed in.', true); history.replaceState(null, '', location.pathname); setTimeout(() => { $('#au').classList.remove('on'); load(); }, 1200);
+  }
+  async function doUp() {
+    const g = id => $(id).value.trim(), name = g('#sn'), user = g('#su').toLowerCase(), email = g('#ae'), dob = g('#sd'), pw = $('#ap').value, minAge = (window.BLUEPRINT_CONFIG || {}).minAge || 16;
+    if (name.length < 2) return say('Please enter your full name.');
+    if (!/^[a-z0-9_.]{3,20}$/.test(user)) return say('Username: 3 to 20 letters, numbers, _ or .');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return say('Please enter a valid email address.');
+    if (!dob) return say('Please enter your date of birth.');
+    const age = ageOf(dob); if (isNaN(age) || age < 0 || age > 120) return say('That date of birth doesn’t look right.');
+    if (age < minAge) return say(`You must be at least ${minAge} years old to use Blueprint.`);
+    if (age < 18 && !$('#spar').checked) return say('A parent or guardian must agree for people under 18.');
+    if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return say('Password: at least 8 characters with letters and numbers.');
+    if (pw !== $('#ap2').value) return say('The two passwords don’t match.');
+    if (!$('#aterms').checked) return say('Please agree to the Terms and Privacy Policy.');
+    say('One moment…', true);
+    const taken = await sb.from('bp_profiles').select('id', { count: 'exact', head: true }).eq('username', user);
+    if (taken.count) return say('That username is taken. Try another.');
+    const r = await sb.auth.signUp({ email, password: pw, options: { emailRedirectTo: back(), data: { terms: true, username: user, display_name: name, dob, country: $('#sc').value, interests: [...picked].map(x => x.toLowerCase()), parent_ok: age < 18 } } });
+    if (r.error) return say(/already|registered/i.test(r.error.message) ? 'That email already has an account. Try signing in.' : /database error/i.test(r.error.message) ? 'We couldn’t create the account. Check your details and try again.' : r.error.message);
+    if (!r.data.session) { aub.innerHTML = `<h2>Check your email</h2><p style='font-size:14px'>We sent a confirmation link to <b>${email.replace(/[<>&"']/g, '')}</b>. Open it, then come back and sign in.</p><div style='margin:10px 2px;font-size:13px'>${lnk('in', 'Go to sign in')}</div>${closeBtn}`; return; }
+    me = r.data.user; $('#au').classList.remove('on'); load(); note('Welcome to Blueprint!', true);
+  }
+  let ut;
+  $('#au').addEventListener('input', e => {
+    if (e.target.id === 'su') { clearTimeout(ut); const u = e.target.value.trim().toLowerCase(), o = $('#sus'); if (!/^[a-z0-9_.]{3,20}$/.test(u)) { o.textContent = u ? '3 to 20 letters, numbers, _ or .' : ''; o.style.color = 'var(--mut)'; return; } ut = setTimeout(async () => { const r = await sb.from('bp_profiles').select('id', { count: 'exact', head: true }).eq('username', u); o.textContent = r.count ? 'Taken. Try another.' : 'Available'; o.style.color = r.count ? '#e5484d' : '#1a9e5a'; }, 400); }
+    if (e.target.id === 'sd') { const a = ageOf(e.target.value); $('#spw').hidden = !(a >= 0 && a < 18); }
+  });
+  $('#au').addEventListener('click', e => {
+    const v = e.target.closest('[data-v]'), pill = e.target.closest('[data-t]'), go = e.target.closest('#go');
+    if (v) { if (v.dataset.v === 'close') $('#au').classList.remove('on'); else showAuth(v.dataset.v); }
+    if (pill) { const t = pill.dataset.t; if (picked.has(t)) picked.delete(t); else if (picked.size < 3) picked.add(t); pill.style.cssText = 'cursor:pointer;' + (picked.has(t) ? 'background:var(--blue);color:#fff' : ''); }
+    if (go) ({ in: doIn, up: doUp, forgot: doForgot, reset: doReset })[go.dataset.k]();
+  });
+  $('#au').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && $('#go')) $('#go').click(); });
+  const openAuth = v => showAuth(v);
 
   // Feed (plain queries, no embeds, so nothing can be ambiguous)
   const pub = (b, path) => sb.storage.from(b).getPublicUrl(path).data.publicUrl;

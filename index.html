@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="bp-version" content="20261030e">
+<meta name="bp-version" content="20261030f">
 <meta name="theme-color" content="#1e6bff">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
@@ -89,6 +89,7 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 .sndrow{display:flex;overflow:hidden;max-width:64%;margin:6px 0 2px;font-size:13px;white-space:nowrap;cursor:pointer}.sndrow .mq{display:inline-block;padding-left:100%;animation:mq 11s linear infinite}@keyframes mq{to{transform:translateX(-100%)}}
 .disc{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#1e6bff 0 22%,#161616 24% 100%);border:2px solid #444;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;cursor:pointer;animation:spin 5s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .post.paused .disc,.post.paused .mq{animation-play-state:paused}.snd:not([data-su]){cursor:default}
+.vslot{display:none}
 </style>
 </head>
 <body>
@@ -156,7 +157,7 @@ const ic={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-
 function visible(){let r=P.slice();if(tab==="follow")r=window.BP?r.filter(p=>p.uid&&followed.has(p.uid)):r.filter((p,i)=>i%2===0);if($("#fam").checked)r=r.filter(p=>!p.tag.includes("fitness"));return r}
 function renderFeed(){
  $("#feed").innerHTML=visible().map(p=>`<article class="post" data-id="${p.id}" style="background:${G[p.g%5]}">
- ${p.imgs?slideHtml(p):p.src?`<video src="${p.src}" loop muted playsinline data-vol="${p.ov??1}"></video>${p.music?musicBtn(p):""}`:`<div class="big">▶<br>${p.t}</div>`}
+ ${p.imgs?slideHtml(p):p.src?`<div class="vslot" data-src="${p.src}" data-vol="${p.ov??1}"></div>${p.music?musicBtn(p):""}`:`<div class="big">▶<br>${p.t}</div>`}
  <div class="rail">${p.uid&&(!window.BP||!window.BP.me||window.BP.me.id!==p.uid)?`<button class="fw ${followed.has(p.uid)?"on":""}" data-a="follow">${followed.has(p.uid)?"✓":"+"}<span>${followed.has(p.uid)?"Following":"Follow"}</span></button>`:""}
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
@@ -220,7 +221,7 @@ $("#post").onclick=()=>{
 };
 // Autoplay the visible video, progress bar
 const fe=$("#feed");
-fe.addEventListener("scroll",()=>{$$(".post video").forEach(v=>{const r=v.getBoundingClientRect(),h=fe.getBoundingClientRect();const on=r.top>=h.top-h.height/2&&r.top<h.top+h.height/2;on?(v.dataset.up==="1"?0:v.play().catch(()=>{})):v.pause()})});
+
 fe.addEventListener("timeupdate",e=>{const v=e.target;if(v.duration){const i=v.closest(".post").querySelector(".bar i");i.style.width=v.currentTime/v.duration*100+"%"}},true);
 // Wellbeing: break reminder
 let mins=0;
@@ -314,24 +315,24 @@ addEventListener('error', function (e) {
   b.onclick = function () { b.remove(); };
 });
 </script>
-<script src="config.js?v=20261030e"></script>
+<script src="config.js?v=20261030f"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="blueprint-supabase.js?v=20261030e"></script>
-<script src="blueprint-profile.js?v=20261030e"></script>
-<script src="blueprint-extra.js?v=20261030e"></script>
-<script src="blueprint-messages.js?v=20261030e"></script>
-<script src="blueprint-sound.js?v=20261030e"></script>
+<script src="blueprint-supabase.js?v=20261030f"></script>
+<script src="blueprint-profile.js?v=20261030f"></script>
+<script src="blueprint-extra.js?v=20261030f"></script>
+<script src="blueprint-messages.js?v=20261030f"></script>
+<script src="blueprint-sound.js?v=20261030f"></script>
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.1.0/dist/tus.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-<script src="blueprint-upload.js?v=20261030e"></script>
-<script src="blueprint-feed.js?v=20261030e"></script>
-<script src="blueprint-safety.js?v=20261030e"></script>
-<script src="blueprint-settings.js?v=20261030e"></script>
-<script src="blueprint-install.js?v=20261030e"></script>
-<script src="blueprint-notify.js?v=20261030e"></script>
-<script src="blueprint-sounds.js?v=20261030e"></script>
-<script src="blueprint-editor.js?v=20261030e"></script>
-<script src="blueprint-mp3.js?v=20261030e"></script>
-<script src="blueprint-explore.js?v=20261030e"></script>
+<script src="blueprint-upload.js?v=20261030f"></script>
+<script src="blueprint-feed.js?v=20261030f"></script>
+<script src="blueprint-safety.js?v=20261030f"></script>
+<script src="blueprint-settings.js?v=20261030f"></script>
+<script src="blueprint-install.js?v=20261030f"></script>
+<script src="blueprint-notify.js?v=20261030f"></script>
+<script src="blueprint-sounds.js?v=20261030f"></script>
+<script src="blueprint-editor.js?v=20261030f"></script>
+<script src="blueprint-mp3.js?v=20261030f"></script>
+<script src="blueprint-explore.js?v=20261030f"></script>
 </body>
 </html>

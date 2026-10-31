@@ -529,3 +529,36 @@ create policy "bp admin delete files" on storage.objects for delete to authentic
 -- 15. Original sounds: a video's own sound can be shared as an MP3 that others can use
 alter table public.bp_videos add column if not exists sound_id uuid references public.bp_sounds(id) on delete set null;
 create index if not exists bp_videos_sound_idx on public.bp_videos (sound_id);
+
+-- 16. Fuller sign-up: private details (date of birth, country), age rules, full name, interests
+create table if not exists public.bp_private (
+  user_id uuid primary key references public.bp_profiles(id) on delete cascade,
+  birth_date date,
+  country text,
+  parent_consent boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table public.bp_private enable row level security;
+drop policy if exists "private read own" on public.bp_private;
+create policy "private read own" on public.bp_private for select to authenticated using (user_id = (select auth.uid()));
+
+create or replace function public.bp_handle_new_user() returns trigger language plpgsql security definer set search_path = '' as $$
+declare md jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb); dob date; uname text; tags text[] := '{}';
+begin
+  begin dob := (md ->> 'dob')::date; exception when others then dob := null; end;
+  if dob is null then raise exception 'Date of birth is required'; end if;
+  if dob > (current_date - interval '16 years') then raise exception 'You must be at least 16 years old'; end if;
+  if dob > (current_date - interval '18 years') and coalesce(md ->> 'parent_ok', 'false') <> 'true' then raise exception 'A parent or guardian must agree'; end if;
+  uname := lower(coalesce(md ->> 'username', ''));
+  if uname !~ '^[a-z0-9_.]{3,20}$' or exists (select 1 from public.bp_profiles where username = uname) then
+    uname := left(lower(regexp_replace(split_part(coalesce(new.email, 'user'), '@', 1), '[^a-zA-Z0-9_.]', '', 'g')), 15) || '_' || substr(new.id::text, 1, 4);
+  end if;
+  begin tags := array(select lower(left(x, 20)) from jsonb_array_elements_text(coalesce(md -> 'interests', '[]'::jsonb)) x limit 5); exception when others then tags := '{}'; end;
+  insert into public.bp_profiles (id, username, display_name, interests, terms_accepted_at)
+  values (new.id, uname, left(nullif(trim(coalesce(md ->> 'display_name', '')), ''), 30), tags, case when (md ->> 'terms') = 'true' then now() end)
+  on conflict (id) do nothing;
+  insert into public.bp_private (user_id, birth_date, country, parent_consent)
+  values (new.id, dob, left(nullif(md ->> 'country', ''), 60), coalesce(md ->> 'parent_ok', 'false') = 'true')
+  on conflict (user_id) do nothing;
+  return new;
+end $$;

@@ -23,8 +23,8 @@
   function render() {
     const box = $('#pf');
     if (live() && !me()) {
-      box.innerHTML = "<div class='pad'><svg width='72' height='72'><use href='#logo'/></svg><h2>Create your profile</h2><div class='card'>Sign in to add your photo, name and bio.</div><button class='btn' id='psi'>Sign in or create account</button></div>";
-      $('#psi').onclick = () => window.BP.openAuth();
+      box.innerHTML = "<div class='pad'><svg width='72' height='72'><use href='#logo'/></svg><h2>Create your profile</h2><div class='card'>Sign in to add your photo, name and bio.</div><button class='btn' id='psi'>Sign in</button><button class='btn alt' id='psu'>Create account</button></div>";
+      $('#psi').onclick = () => window.BP.openAuth('in'); $('#psu').onclick = () => window.BP.openAuth('up');
       return;
     }
     const v = mine(), likes = v.reduce((a, p) => a + p.l, 0);

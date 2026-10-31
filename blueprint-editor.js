@@ -39,7 +39,7 @@ void main(){
   const gl = cv.getContext('webgl', { preserveDrawingBuffer: true, antialias: false });
   if (!gl) return;
   const mk = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
-  const pr = gl.createProgram(); gl.attachShader(pr, mk(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, mk(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); gl.useProgram(pr);
+  const pr = gl.createProgram(); gl.attachShader(pr, mk(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, mk(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); const glOK = gl.getProgramParameter(pr, gl.LINK_STATUS); gl.useProgram(pr);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const al = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(al); gl.vertexAttribPointer(al, 2, gl.FLOAT, false, 0, 0);
   const U = n => gl.getUniformLocation(pr, n), UL = {};
@@ -54,8 +54,8 @@ void main(){
   const LOOK0 = { bright: 0, contrast: 1, sat: 1, warm: 0, vig: 0 };
   const fresh = () => ({ mode: 'video', start: 0, end: 0, dur: 0, speed: 1, fit: 'fill', origVol: 1, music: null, musicVol: .8, musicStart: 0, ...LOOK0, key: false, kc: [0, 1, 0], sim: .35, sm: .12, sp: .5, bgImg: false, bgc: [.04, .1, .25], bgScale: 1, bgx: 0, bgy: 0, text: '', tcol: '#ffffff', tsize: 64, ty: .78 });
   let S = fresh(), vid = document.createElement('video'), ml = new Audio(), mb = new Audio(), imgs = [], cur = 0, opened = false, exporting = false, cancel = false, picking = false, raf = 0, ctx, dst, mon, vG, mG, srcFile = null;
-  vid.playsInline = true; vid.preload = 'auto'; ml.loop = true; mb.loop = true;
-  const txc = document.createElement('canvas');
+  vid.setAttribute('playsinline', ''); vid.preload = 'auto'; vid.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none'; document.body.appendChild(vid); ml.loop = true; mb.loop = true;
+  const txc = document.createElement('canvas'), fc = document.createElement('canvas'), fx = fc.getContext('2d');
   window.BPEdit = { video: null, photos: null, sound: null, clear() { this.video = null; this.photos = null; this.sound = null; stat(); } };
   function preloadSound() { const q = window.BPEdit.sound; if (q) { S.music = { kind: 'lib', url: q.url, title: q.title, credit: q.credit }; mb.src = q.url; S.origVol = .4; } }
 
@@ -72,7 +72,13 @@ void main(){
   const srcSize = () => { const e = srcEl(); return e ? (S.mode === 'video' ? [e.videoWidth, e.videoHeight] : [e.naturalWidth, e.naturalHeight]) : [0, 0]; };
   function fitScale() { const [w, h] = srcSize(); if (!w) return [1, 1]; const va = w / h, ca = cv.width / cv.height; return S.fit === 'fill' ? (va > ca ? [ca / va, 1] : [1, va / ca]) : (va > ca ? [1, va / ca] : [ca / va, 1]); }
   function render() {
-    const e = srcEl(); if (e && (S.mode === 'photo' || vid.readyState >= 2)) put(0, tV, e);
+    const e = srcEl();
+    if (e && (S.mode === 'photo' || vid.readyState >= 2)) {
+      if (S.mode === 'video') { // copy the frame through a normal canvas first: more reliable on iPhone
+        const w = vid.videoWidth, h = vid.videoHeight;
+        if (w) { const k = Math.min(1, 1280 / Math.max(w, h)), cw = Math.round(w * k), ch = Math.round(h * k); if (fc.width !== cw || fc.height !== ch) { fc.width = cw; fc.height = ch; } fx.drawImage(vid, 0, 0, cw, ch); put(0, tV, fc); }
+      } else put(0, tV, e);
+    }
     const [sx, sy] = fitScale(); gl.viewport(0, 0, cv.width, cv.height);
     gl.uniform2f(UL.uVs, sx, sy); gl.uniform2f(UL.uVo, 0, 0); gl.uniform2f(UL.uBs, 1 / S.bgScale, 1 / S.bgScale); gl.uniform2f(UL.uBo, S.bgx, S.bgy);
     gl.uniform3fv(UL.uKc, S.kc); gl.uniform3fv(UL.uBc, S.bgc); gl.uniform1f(UL.uHasB, S.bgImg ? 1 : 0);
@@ -83,6 +89,7 @@ void main(){
   function loop() {
     if (!opened) return;
     render();
+    if (exporting && xx) xx.drawImage(cv, 0, 0, xc.width, xc.height);
     if (S.mode === 'video') {
       if (exporting) { if (vid.currentTime >= S.end - .04 || vid.ended) finishExport(); else prog((vid.currentTime - S.start) / (S.end - S.start)); }
       else { if (vid.currentTime >= S.end || vid.ended) { vid.currentTime = S.start; musicRestart(); if (!vid.paused) vid.play().catch(() => {}); } $('#vtm').textContent = tm(vid.currentTime - S.start) + ' / ' + tm(S.end - S.start); }
@@ -197,11 +204,13 @@ void main(){
   function show() { ids('vedt').classList.add('on'); opened = true; tabs(); panel(); drawText(); cancelAnimationFrame(raf); loop(); }
   function hide() { opened = false; cancelAnimationFrame(raf); musicStop(); vid.pause(); ids('vedt').classList.remove('on'); ids('vprog').style.display = 'none'; picking = false; }
   async function openVideo(file) {
+    if (!glOK) return BP.note('Editing isn’t available on this phone. You can still post without editing.');
     S = fresh(); S.mode = 'video'; srcFile = file; preloadSound(); tab = 'trim'; ids('vtt').textContent = 'Edit video'; initAudio(); await ctx.resume();
     vid.src = URL.createObjectURL(file); await new Promise((ok, no) => { vid.onloadedmetadata = ok; vid.onerror = () => no(new Error('This video can’t be opened for editing.')); }).catch(e => { BP.note(e.message); throw e; });
     S.dur = vid.duration; S.end = Math.min(S.dur, 1200); applyVol(); show(); vid.currentTime = 0; vid.play().then(() => { ids('vpl').style.display = 'none'; }).catch(() => { ids('vpl').style.display = 'flex'; });
   }
   async function openPhotos(files) {
+    if (!glOK) return BP.note('Editing isn’t available on this phone. You can still post without editing.');
     S = fresh(); S.mode = 'photo'; tab = 'sound'; preloadSound(); ids('vtt').textContent = 'Edit photos'; initAudio(); await ctx.resume(); imgs = []; cur = 0;
     for (const f of files.slice(0, 10)) { const im = new Image(); im.src = URL.createObjectURL(f); try { await im.decode(); imgs.push(im); } catch (e) { BP.note('One photo can’t be opened. Use JPG or PNG.'); } }
     if (!imgs.length) return; S.fit = 'fit'; show();
@@ -212,14 +221,14 @@ void main(){
 
   // ---------- Export ----------
   function musicFields() { const m = S.music; return m && m.kind === 'lib' ? { music_url: m.url, music_title: m.title, music_credit: m.credit, music_vol: S.musicVol, orig_vol: S.origVol, music_start: S.musicStart } : null; }
-  let rec, chunks, t0, mime;
+  let rec, chunks, t0, mime, xc = null, xx = null;
   ids('vdn').onclick = async () => {
     if (S.mode === 'photo') return exportPhotos();
     if (exporting) return; exporting = true; cancel = false; picking = false;
     const dur = (S.end - S.start) / S.speed, bps = Math.round(Math.max(4e5, Math.min(2.5e6, MAXMB * .9 * 8e6 / dur - 96e3)));
     cv.width = 720; cv.height = 1280; drawText(); applyVol(); mon.gain.value = 0; musicStop();
     ids('vprog').style.display = 'flex'; ids('vpt').textContent = 'Starting…';
-    const stream = cv.captureStream(30); dst.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    xc = document.createElement('canvas'); xc.width = 720; xc.height = 1280; xx = xc.getContext('2d'); const stream = xc.captureStream(30); dst.stream.getAudioTracks().forEach(t => stream.addTrack(t));
     mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
     if (!mime) { exporting = false; ids('vprog').style.display = 'none'; return BP.note('This browser can’t save edited videos. Try Chrome.'); }
     chunks = []; rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps, audioBitsPerSecond: 96000 }); rec.ondataavailable = e => e.data.size && chunks.push(e.data);
@@ -247,9 +256,9 @@ void main(){
   // ---------- Hook into the post sheet ----------
   const stat = () => { const e = window.BPEdit, s = ids('edst'); if (!s) return; const snd = e.sound ? `<div>♪ Using sound: ${esc(e.sound.title)} · <a id='edsx' style='text-decoration:underline;cursor:pointer'>remove</a></div>` : ''; s.innerHTML = snd + (e.video ? `✓ Edited video ready (${tm(e.video.duration)}) · <a id='edrm' style='text-decoration:underline;cursor:pointer'>remove edits</a>` : e.photos ? `✓ ${e.photos.blobs.length} edited photos ready · <a id='edrm' style='text-decoration:underline;cursor:pointer'>remove edits</a>` : ''); const sx = ids('edsx'); if (sx) sx.onclick = () => { window.BPEdit.sound = null; stat(); }; const rm = ids('edrm'); if (rm) rm.onclick = () => { window.BPEdit.video = window.BPEdit.photos = null; stat(); }; };
   window.BPEdit.refresh = stat;
-  $('#file').insertAdjacentHTML('afterend', "<button class='btn alt' id='edv' hidden>✂ Edit video</button><div id='edst' style='font-size:13px;color:var(--blue);margin:4px 0'></div>");
+  $('#file').insertAdjacentHTML('afterend', "<video id='upv' playsinline muted controls preload='metadata' style='display:none;width:100%;max-height:220px;border-radius:10px;background:#000;margin:6px 0'></video><button class='btn alt' id='edv' hidden>✂ Edit video</button><div id='edst' style='font-size:13px;color:var(--blue);margin:4px 0'></div>");
   $('#pimg').insertAdjacentHTML('afterend', "<button class='btn alt' id='edp' hidden>✂ Edit photos</button>");
-  $('#file').addEventListener('change', () => { window.BPEdit.video = null; stat(); ids('edv').hidden = !$('#file').files[0]; });
+  $('#file').addEventListener('change', () => { window.BPEdit.video = null; stat(); const f = $('#file').files[0], pv = ids('upv'); ids('edv').hidden = !f; if (f) { pv.src = URL.createObjectURL(f) + '#t=0.1'; pv.style.display = 'block'; } else pv.style.display = 'none'; });
   $('#pimg').addEventListener('change', () => { window.BPEdit.photos = null; stat(); ids('edp').hidden = !$('#pimg').files.length; });
   ids('edv').onclick = () => { const f = $('#file').files[0]; if (f) openVideo(f).catch(() => {}); };
   ids('edp').onclick = () => { const f = [...$('#pimg').files]; if (f.length) openPhotos(f); };
