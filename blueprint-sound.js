@@ -10,6 +10,12 @@
   const pool = document.getElementById('vpool');
   const mk = () => { const v = document.createElement('video'); v.loop = true; v.muted = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', ''); pool.appendChild(v); return v; };
   let active = mk(), spare = mk();
+  const muOf = v => (v.parentNode && v.parentNode.querySelector ? v.parentNode.querySelector('.mu') : null);
+  [active, spare].forEach(v => { // keep music tied to the video: no music while the video is buffering
+    ['waiting', 'stalled'].forEach(ev => v.addEventListener(ev, () => { if (v === active && muOf(v) && !au.paused) au.pause(); }));
+    ['playing', 'canplay'].forEach(ev => v.addEventListener(ev, () => { if (v === active) later(30); }));
+    v.addEventListener('timeupdate', () => { if (v !== active) return; if (v.currentTime + 0.5 < (v._lt || 0)) { const mu = muOf(v); if (mu && !au.paused) { try { au.currentTime = +(mu.dataset.start || 0); } catch (e) {} } } v._lt = v.currentTime; });
+  });
   const slotOf = p => (p ? p.querySelector('.vslot') : null);
   const setSrc = (v, s) => { v.dataset.s = s; v.dataset.u = ''; v.dataset.up = ''; v.src = s; v.load(); };
 
@@ -19,6 +25,7 @@
 
   function sync() {
     const posts = [...feed.querySelectorAll('.post')], cur = feedOn() ? current() : null, ci = cur ? posts.indexOf(cur) : -1, slot = slotOf(cur);
+    posts.forEach(p => p.classList.toggle('cur', p === cur));
     if (slot) {
       const src = slot.dataset.src;
       if (active.dataset.s !== src && spare.dataset.s === src) [active, spare] = [spare, active];
@@ -32,20 +39,25 @@
       if (active.parentNode !== pool) pool.appendChild(active);
     }
     // the spare player loads the next video in the background
+    // load the next video only after the current one has buffered ahead, so they never fight for the connection
+    const bf = active.buffered, ahead = bf && bf.length ? bf.end(bf.length - 1) - active.currentTime : 0;
+    const ready = !slot || active.readyState >= 4 || ahead > 6 || (active.duration && ahead >= active.duration - active.currentTime - 0.5);
     const nxt = ci >= 0 ? posts.slice(ci + 1).find(slotOf) : null;
-    if (nxt) { const ns = slotOf(nxt).dataset.src; if (spare.dataset.s !== ns) setSrc(spare, ns); }
+    if (nxt && ready) { const ns = slotOf(nxt).dataset.src; if (spare.dataset.s !== ns) setSrc(spare, ns); }
     if (spare.parentNode !== pool) pool.appendChild(spare);
     if (!spare.paused) spare.pause();
 
     // music: photo posts and sounds attached to a video
+    const playingOK = !slot || (!active.paused && active.readyState >= 3 && !active.seeking);
     const mu = cur && cur.querySelector('.mu');
     if (mu) {
       if (off && off !== mu.dataset.src) off = null;
-      if (sound && !needTap && off !== mu.dataset.src && !(slot && active.dataset.up === '1')) {
+      if (sound && !needTap && off !== mu.dataset.src && !(slot && active.dataset.up === '1') && playingOK) {
         if (au.src !== mu.dataset.src) { au.src = mu.dataset.src; const st = +(mu.dataset.start || 0); if (st) au.addEventListener('loadedmetadata', () => { au.currentTime = st; }, { once: true }); }
         au.volume = Math.min(1, +(mu.dataset.vol || 1));
         if (au.paused) au.play().catch(() => { needTap = true; });
       }
+      if (slot && !playingOK && !au.paused) au.pause();
       mu.classList.toggle('on', !au.paused && au.src === mu.dataset.src);
     } else if (!au.paused) au.pause();
   }
@@ -54,6 +66,7 @@
   const gesture = () => {
     if (sound && !needTap) return;
     sound = true; needTap = false; justOn = true; setTimeout(() => { justOn = false; }, 0); sync();
+    if (!spare.src) { const nx = [...feed.querySelectorAll('.vslot')].find(x => x.dataset.s !== active.dataset.s && x.dataset.src !== active.dataset.s); if (nx) setSrc(spare, nx.dataset.src); }
     if (spare.src) { spare.muted = false; spare.volume = 0; spare.play().then(() => { spare.pause(); spare.currentTime = 0; spare.volume = 1; }).catch(() => { spare.volume = 1; }); }
   };
   ['click', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, gesture, true));

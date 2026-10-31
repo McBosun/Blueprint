@@ -28,36 +28,32 @@ window.BPUpload = {
     });
   },
 
-  // Re-encode a video at a lower bitrate so it fits the storage limit. Runs in real time:
-  // a 3 minute video takes about 3 minutes. Needs Chrome, Edge, Firefox or Android browsers.
+  // Re-encode a video so it plays smoothly for everyone: at most 1280 pixels on the long side and a modest bitrate.
+  // It runs in real time: a 3 minute video takes about 3 minutes. Needs Chrome, Edge, Firefox or a recent iPhone.
   compress(file, targetMB, onProgress) {
     return new Promise((ok, no) => {
-      const v = document.createElement('video');
-      v.playsInline = true; v.preload = 'auto';
-      const url = URL.createObjectURL(file); v.src = url;
-      const cap = v.captureStream ? () => v.captureStream() : v.mozCaptureStream ? () => v.mozCaptureStream() : null;
-      if (!cap || !window.MediaRecorder) { URL.revokeObjectURL(url); return no(new Error('Compression isn’t supported in this browser. Trim the video or use Chrome.')); }
-      v.onerror = () => { URL.revokeObjectURL(url); no(new Error('That video can’t be read for compression.')); };
+      const v = document.createElement('video'), url = URL.createObjectURL(file);
+      v.setAttribute('playsinline', ''); v.preload = 'auto'; v.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none'; document.body.appendChild(v); v.src = url;
+      const fail = e => { v.remove(); URL.revokeObjectURL(url); no(e); };
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return fail(new Error('Optimizing isn’t supported in this browser. Trim the video or use Chrome.'));
+      v.onerror = () => fail(new Error('That video can’t be read.'));
       v.onloadedmetadata = async () => {
         try {
-          const dur = v.duration;
-          if (!isFinite(dur) || dur <= 0) throw new Error('Couldn’t read the video length.');
-          const ac = new (window.AudioContext || window.webkitAudioContext)(), dest = ac.createMediaStreamDestination();
-          ac.createMediaElementSource(v).connect(dest); // audio goes to the recorder, not the speakers
-          const vt = cap().getVideoTracks()[0];
-          const stream = new MediaStream([vt, ...dest.stream.getAudioTracks()]);
-          const audioBps = 96000, bps = Math.max(250000, Math.min(2500000, Math.floor(targetMB * 8e6 / dur * 0.85 - audioBps)));
-          const rec = new MediaRecorder(stream, { videoBitsPerSecond: bps, audioBitsPerSecond: audioBps });
+          const dur = v.duration, vw = v.videoWidth, vh = v.videoHeight;
+          if (!isFinite(dur) || !vw) throw new Error('Couldn’t read the video.');
+          const k = Math.min(1, 1280 / Math.max(vw, vh)), cw = Math.round(vw * k / 2) * 2, ch = Math.round(vh * k / 2) * 2;
+          const cvs = document.createElement('canvas'); cvs.width = cw; cvs.height = ch; const c2 = cvs.getContext('2d');
+          const ac = new (window.AudioContext || window.webkitAudioContext)(), dest = ac.createMediaStreamDestination(); ac.createMediaElementSource(v).connect(dest);
+          const stream = cvs.captureStream(30); dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+          const abps = 96000, bps = Math.max(250000, Math.min(2500000, Math.floor(targetMB * 8e6 / dur * 0.85 - abps)));
+          const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m));
+          const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps, audioBitsPerSecond: abps });
           const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-          rec.onstop = () => {
-            clearInterval(tick); ac.close(); URL.revokeObjectURL(url);
-            const type = (rec.mimeType || 'video/webm').split(';')[0];
-            ok({ blob: new Blob(chunks, { type }), type, duration: Math.round(dur) });
-          };
-          const tick = setInterval(() => { if (onProgress) onProgress(Math.min(99, Math.round(v.currentTime / dur * 100))); }, 500);
+          let raf; const draw = () => { c2.drawImage(v, 0, 0, cw, ch); if (onProgress) onProgress(Math.min(99, Math.round(v.currentTime / dur * 100))); raf = requestAnimationFrame(draw); };
+          rec.onstop = () => { cancelAnimationFrame(raf); ac.close(); v.remove(); URL.revokeObjectURL(url); const type = (mime || 'video/webm').split(';')[0]; ok({ blob: new Blob(chunks, { type }), type, duration: Math.round(dur) }); };
           v.onended = () => rec.stop();
-          rec.start(1000); await ac.resume(); await v.play();
-        } catch (e) { URL.revokeObjectURL(url); no(e); }
+          rec.start(1000); await ac.resume(); await v.play(); draw();
+        } catch (e) { fail(e); }
       };
     });
   }

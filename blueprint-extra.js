@@ -35,7 +35,7 @@
 #bd{display:none;position:absolute;top:-4px;right:-4px;background:#e5484d;color:#fff;font-size:10px;border-radius:99px;padding:1px 5px}
 .nrow{padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}.nrow.un{font-weight:700}.nrow small{color:var(--mut);white-space:nowrap}
 </style>`);
-  $('header').insertAdjacentHTML('beforeend', "<button id='bell' aria-label='Notifications'>🔔<span id='bd'></span></button>");
+  $('header').insertAdjacentHTML('beforeend', "<button id='bell' aria-label='Notifications'>⏰<span id='bd'></span></button>");
   $('header').insertAdjacentHTML('afterend', "<div id='lvbar'></div>");
   $('#lt').insertAdjacentHTML('afterend', "<span id='lvw'></span>");
   document.body.insertAdjacentHTML('beforeend', `<div class='ovp' id='op'></div>
@@ -82,7 +82,7 @@
     const draw = () => {
       op.innerHTML = `<div style='padding:8px 12px'><button class='btn alt' id='opx' style='width:auto;margin:0'>‹ Back</button></div><div class='cover'></div>
 ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg class='av' viewBox='0 0 100 100'><use href='#logo'/></svg>"}
-<div class='pn'><h2>${esc(p.display_name || p.username)}</h2><div class='un'>@${esc(p.username)}</div>${p.bio ? `<p>${esc(p.bio)}</p>` : ''}
+<div class='pn'><h2>${esc(p.display_name || p.username)}${p.verified ? '<span class="vb">✓</span>' : ''}</h2><div class='un'>@${esc(p.username)}</div>${p.bio ? `<p>${esc(p.bio)}</p>` : ''}
 <div style='font-size:12px;color:var(--mut)'>${esc(p.location || '')}${p.location && p.link ? ' · ' : ''}${p.link ? `<a href='${esc(p.link)}' target='_blank' rel='noopener noreferrer' style='color:var(--blue)'>${esc(p.link.replace(/^https?:\/\//, ''))}</a>` : ''}</div>
 <div style='margin-top:8px'>${(p.interests || []).map(t => `<span class='pill'>#${esc(t)}</span>`).join('')}</div></div>
 <div class='st'><div><b>${posts.length}</b><span>Posts</span></div><div><b>${fc}</b><span>Followers</span></div><div><b>${f2.count || 0}</b><span>Following</span></div><div><b>${n(likes)}</b><span>Likes</span></div></div>
@@ -116,11 +116,11 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     const isTag = raw.startsWith('#'), orQ = isTag ? `tags.cs.{${tag}}` : `title.ilike.*${v}*,caption.ilike.*${v}*` + (tag ? `,tags.cs.{${tag}}` : '');
     const [pv, pp] = await Promise.all([
       sb.from('bp_videos').select('*').or(orQ).order('created_at', { ascending: false }).limit(30),
-      isTag ? Promise.resolve({ data: [] }) : sb.from('bp_profiles').select('id,username,display_name').or(`username.ilike.*${v}*,display_name.ilike.*${v}*`).limit(10)
+      isTag ? Promise.resolve({ data: [] }) : sb.from('bp_profiles').select('id,username,display_name,verified').or(`username.ilike.*${v}*,display_name.ilike.*${v}*`).limit(10)
     ]);
     if ($('#q').value.trim() !== raw) return; // a newer search is running
     found = await BP.build(pv.data || []);
-    const people = (pp.data || []).map(x => `<div class='row' data-uid='${x.id}' style='cursor:pointer'><span>@${esc(x.username)} <small style='color:var(--mut)'>${esc(x.display_name || '')}</small></span><b style='color:var(--blue)'>View</b></div>`).join('');
+    const people = (pp.data || []).map(x => `<div class='row' data-uid='${x.id}' style='cursor:pointer'><span>@${esc(x.username)}${x.verified ? ' <span class="vb">✓</span>' : ''} <small style='color:var(--mut)'>${esc(x.display_name || '')}</small></span><b style='color:var(--blue)'>View</b></div>`).join('');
     $('#grid').innerHTML = (people ? `<div style='column-span:all;margin-bottom:8px'>${people}</div>` : '') +
       found.map((p, i) => `<div class="tile" data-id="${esc(p.id)}"><div class="th" style="background:${G[p.g % 5]};height:${110 + (i % 3) * 40}px">${typeof tileMedia === 'function' ? tileMedia(p) : ''}<span class="tt">${esc(p.t)}</span></div><div class="m"><b>${esc(p.u)}</b>${n(p.l)} likes</div></div>`).join('') ||
       (people ? '' : `<p class='pad'>No results for “${esc(raw)}”.</p>`);
@@ -249,7 +249,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
 
   // ---------- Notifications and profile views ----------
   let notes = [], noteCh = null, tabN = 'n';
-  const text = { live: x => `${x.u} is live: ${esc(x.body || '')}`, comment: x => `${x.u} commented: “${esc(x.body || '')}”`, follow: x => `${x.u} started following you`, like: x => `${x.u} liked your post`, view: x => `${x.u} viewed your profile` };
+  const text = { live: x => `${x.u} is live: ${esc(x.body || '')}`, comment: x => `${x.u} commented: “${esc(x.body || '')}”`, follow: x => `${x.u} started following you`, like: x => `${x.u} liked your post`, verify: x => esc(x.body || 'Your verification was reviewed'), view: x => `${x.u} viewed your profile` };
   async function loadNotes() {
     if (!me()) { $('#bd').style.display = 'none'; return; }
     const r = await sb.from('bp_notifications').select('*').order('created_at', { ascending: false }).limit(50);
@@ -289,6 +289,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     const x = notes.find(n => n.id === row.dataset.i); if (!x) return;
     if (x.type === 'comment' || x.type === 'like') openPost(x.video_id);
     else if (x.type === 'live') { const l = await sb.from('bp_lives').select('id,title,status').eq('id', x.live_id).maybeSingle(); l.data && l.data.status === 'live' ? openViewer(l.data.id, x.u, l.data.title) : BP.note('That live has ended.'); }
+    else if (x.type === 'verify') document.querySelector('nav [data-v="me"]').click();
     else openProfile(x.actor_id);
   };
   function startNotes() {

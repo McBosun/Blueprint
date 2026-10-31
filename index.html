@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="bp-version" content="20261030f">
+<meta name="bp-version" content="20261030h">
 <meta name="theme-color" content="#1e6bff">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
@@ -91,6 +91,7 @@ input,textarea{width:100%;background:var(--card);color:var(--fg);border:1px soli
 .post.paused .disc,.post.paused .mq{animation-play-state:paused}.snd:not([data-su]){cursor:default}
 .vslot{display:none}
 </style>
+<link rel="stylesheet" href="blueprint-ui.css?v=20261030h">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute"><defs>
@@ -148,6 +149,8 @@ let saved=new Set(),liked=new Set(),followed=new Set(),cur=null,tab="foryou";
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 const n=x=>x>=1000?(x/1000).toFixed(1).replace(".0","")+"K":x;
+const vb='<span class="vb" title="Verified">\u2713</span>';
+const avatarBtn=p=>`<div class="avw"><div class="av2 ul" data-uid="${p.uid}">${p.av?`<img src="${p.av}" alt="">`:`<span>${(p.u||"@?").charAt(1).toUpperCase()}</span>`}</div>${(!window.BP||!window.BP.me||window.BP.me.id!==p.uid)&&!followed.has(p.uid)?`<button class="fplus" data-a="follow" aria-label="Follow">+</button>`:""}</div>`;
 const sndLabel=p=>p.music?p.mt:p.surl?p.sname:"Original audio \u00b7 "+p.u;
 const sndAttr=p=>p.music||p.surl?` data-su="${p.music||p.surl}" data-st="${sndLabel(p)}" data-sc="${p.mc||""}" data-sid="${p.sid||""}"`:"";
 const sndRow=p=>`<div class="sndrow snd"${sndAttr(p)}><span class="mq">\u266a ${sndLabel(p)}${p.mc?" \u00b7 "+p.mc:""}</span></div>`;
@@ -158,12 +161,12 @@ function visible(){let r=P.slice();if(tab==="follow")r=window.BP?r.filter(p=>p.u
 function renderFeed(){
  $("#feed").innerHTML=visible().map(p=>`<article class="post" data-id="${p.id}" style="background:${G[p.g%5]}">
  ${p.imgs?slideHtml(p):p.src?`<div class="vslot" data-src="${p.src}" data-vol="${p.ov??1}"></div>${p.music?musicBtn(p):""}`:`<div class="big">▶<br>${p.t}</div>`}
- <div class="rail">${p.uid&&(!window.BP||!window.BP.me||window.BP.me.id!==p.uid)?`<button class="fw ${followed.has(p.uid)?"on":""}" data-a="follow">${followed.has(p.uid)?"✓":"+"}<span>${followed.has(p.uid)?"Following":"Follow"}</span></button>`:""}
+ <div class="rail">${p.uid?avatarBtn(p):""}
  <button class="lk ${liked.has(p.id)?"on":""}" data-a="like">${ic.h}<span>${n(p.l+(liked.has(p.id)?1:0))}</span></button>
  <button data-a="cm">${ic.c}<span>${p.c.length}</span></button>
  <button class="sv ${saved.has(p.id)?"on":""}" data-a="sv">${ic.b}<span>Blueprint</span></button>
  <button data-a="sh">${ic.s}<span>Share</span></button>${p.src||p.imgs?(p.dl===false&&!(window.BP&&window.BP.me&&window.BP.me.id===p.uid)?"":`<button data-a="dl">⬇<span>Download</span></button>`):""}${window.BP&&window.BP.me&&p.uid&&window.BP.me.id===p.uid?`<button data-a="del">🗑<span>Delete</span></button>`:(p.uid?`<button data-a="rep">⚑<span>Report</span></button>`:"")}${p.src||p.imgs?sndDisc(p):""}</div>
- <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.src||p.imgs?sndRow(p):""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
+ <div class="info">${p.tag.map(t=>`<span class="chip" data-tag="${t}">#${t}</span>`).join("")}<span class="chip">${p.imgs?p.imgs.length+" photo"+(p.imgs.length>1?"s":""):p.tag.includes("live")?"Live replay "+fmt(p.d):fmt(p.d)+" of 20:00 max"}</span><h3>${p.t}</h3>${p.src||p.imgs?sndRow(p):""}<p><span class="ul" data-uid="${p.uid||""}">${p.u}</span>${p.vf?vb:""}${p.steps?` · ${p.steps.length} steps · tap Blueprint to keep the guide`:""}</p></div>
  <div class="bar"><i></i></div></article>`).join("");
 }
 function renderGrid(){
@@ -315,24 +318,26 @@ addEventListener('error', function (e) {
   b.onclick = function () { b.remove(); };
 });
 </script>
-<script src="config.js?v=20261030f"></script>
+<script src="config.js?v=20261030h"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="blueprint-supabase.js?v=20261030f"></script>
-<script src="blueprint-profile.js?v=20261030f"></script>
-<script src="blueprint-extra.js?v=20261030f"></script>
-<script src="blueprint-messages.js?v=20261030f"></script>
-<script src="blueprint-sound.js?v=20261030f"></script>
+<script src="blueprint-supabase.js?v=20261030h"></script>
+<script src="blueprint-profile.js?v=20261030h"></script>
+<script src="blueprint-extra.js?v=20261030h"></script>
+<script src="blueprint-messages.js?v=20261030h"></script>
+<script src="blueprint-sound.js?v=20261030h"></script>
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.1.0/dist/tus.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-<script src="blueprint-upload.js?v=20261030f"></script>
-<script src="blueprint-feed.js?v=20261030f"></script>
-<script src="blueprint-safety.js?v=20261030f"></script>
-<script src="blueprint-settings.js?v=20261030f"></script>
-<script src="blueprint-install.js?v=20261030f"></script>
-<script src="blueprint-notify.js?v=20261030f"></script>
-<script src="blueprint-sounds.js?v=20261030f"></script>
-<script src="blueprint-editor.js?v=20261030f"></script>
-<script src="blueprint-mp3.js?v=20261030f"></script>
-<script src="blueprint-explore.js?v=20261030f"></script>
+<script src="blueprint-upload.js?v=20261030h"></script>
+<script src="blueprint-feed.js?v=20261030h"></script>
+<script src="blueprint-safety.js?v=20261030h"></script>
+<script src="blueprint-settings.js?v=20261030h"></script>
+<script src="blueprint-install.js?v=20261030h"></script>
+<script src="blueprint-notify.js?v=20261030h"></script>
+<script src="blueprint-sounds.js?v=20261030h"></script>
+<script src="blueprint-editor.js?v=20261030h"></script>
+<script src="blueprint-mp3.js?v=20261030h"></script>
+<script src="blueprint-explore.js?v=20261030h"></script>
+<script src="blueprint-guides.js?v=20261030h"></script>
+<script src="blueprint-verify.js?v=20261030h"></script>
 </body>
 </html>

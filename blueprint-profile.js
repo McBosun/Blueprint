@@ -33,7 +33,7 @@
     const tabs = [['videos', 'Posts'], ['lives', 'Lives'], ['saved', 'Saved']].map(t => `<button data-t='${t[0]}' class='${tab === t[0] ? 'on' : ''}'>${t[1]}</button>`).join('');
     box.innerHTML = `<div class='cover'></div>
 ${prof.avatar_url ? `<img class='av' src='${esc(prof.avatar_url)}' alt=''>` : "<svg class='av' viewBox='0 0 100 100'><use href='#logo'/></svg>"}
-<div class='pn'><h2>${esc(prof.display_name || prof.username)}</h2><div class='un'>@${esc(prof.username)}</div>
+<div class='pn'><h2>${esc(prof.display_name || prof.username)}${prof.verified ? '<span class="vb">✓</span>' : ''}</h2><div class='un'>@${esc(prof.username)}</div>
 ${prof.bio ? `<p>${esc(prof.bio)}</p>` : "<p style='color:var(--mut)'>Add a bio so people know what you make.</p>"}
 <div style='font-size:12px;color:var(--mut)'>${esc(prof.location)}${prof.location && prof.link ? ' · ' : ''}${prof.link ? `<a href='${esc(prof.link)}' target='_blank' rel='noopener noreferrer' style='color:var(--blue)'>${esc(prof.link.replace(/^https?:\/\//, ''))}</a>` : ''}</div>
 <div style='margin-top:8px'>${prof.interests.map(t => `<span class='pill'>#${esc(t)}</span>`).join('')}</div></div>
@@ -91,7 +91,7 @@ ${done < 6 ? `<div class='card' style='margin:0 16px 8px'>Profile ${Math.round(d
     const link = $('#ek').value.trim();
     if (link && !/^https?:\/\/\S+\.\S+$/.test(link)) { m.textContent = 'Link must start with https://'; return; }
     const interests = $('#ei').value.split(',').map(s => s.trim().replace(/^#/, '').toLowerCase()).filter(Boolean).slice(0, 5);
-    const next = { username, display_name: $('#en').value.trim(), bio: $('#eb').value.trim(), location: $('#el').value.trim(), link: link || null, interests };
+    const next = { username, display_name: $('#en').value.replace(/[✓✔☑]/g, '').trim(), bio: $('#eb').value.trim(), location: $('#el').value.trim(), link: link || null, interests };
     m.className = 'msg'; m.textContent = 'Saving…';
     try {
       if (newAvatar) {

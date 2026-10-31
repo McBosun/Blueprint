@@ -61,7 +61,7 @@
     say('Password changed. You are signed in.', true); history.replaceState(null, '', location.pathname); setTimeout(() => { $('#au').classList.remove('on'); load(); }, 1200);
   }
   async function doUp() {
-    const g = id => $(id).value.trim(), name = g('#sn'), user = g('#su').toLowerCase(), email = g('#ae'), dob = g('#sd'), pw = $('#ap').value, minAge = (window.BLUEPRINT_CONFIG || {}).minAge || 16;
+    const g = id => $(id).value.trim(), name = g('#sn').replace(/[✓✔☑]/g, '').trim(), user = g('#su').toLowerCase(), email = g('#ae'), dob = g('#sd'), pw = $('#ap').value, minAge = (window.BLUEPRINT_CONFIG || {}).minAge || 16;
     if (name.length < 2) return say('Please enter your full name.');
     if (!/^[a-z0-9_.]{3,20}$/.test(user)) return say('Username: 3 to 20 letters, numbers, _ or .');
     if (!/^\S+@\S+\.\S+$/.test(email)) return say('Please enter a valid email address.');
@@ -101,13 +101,13 @@
     const ids = rows.map(v => v.id), uids = [...new Set(rows.map(v => v.user_id))];
     const sids = [...new Set(rows.map(v => v.sound_id).filter(Boolean))];
     const [pr, lk, cm, sd] = await Promise.all([
-      sb.from('bp_profiles').select('id,username').in('id', uids),
+      sb.from('bp_profiles').select('id,username,avatar_url,verified').in('id', uids),
       sb.from('bp_likes').select('video_id').in('video_id', ids),
       sb.from('bp_comments').select('video_id').in('video_id', ids),
       sids.length ? sb.from('bp_sounds').select('id,title,artist,audio_path').in('id', sids) : { data: [] }
     ]);
     const SD = {}; (sd.data || []).forEach(x => { SD[x.id] = x; });
-    const nm = {}; (pr.data || []).forEach(x => { nm[x.id] = x.username; });
+    const nm = {}, AV = {}, VF = {}; (pr.data || []).forEach(x => { nm[x.id] = x.username; AV[x.id] = x.avatar_url; VF[x.id] = x.verified; });
     const cnt = r => { const m = {}; (r.data || []).forEach(x => { m[x.video_id] = (m[x.video_id] || 0) + 1; }); return m; };
     const L = cnt(lk), K = cnt(cm);
     return rows.map((v, i) => {
@@ -120,7 +120,7 @@
       } else post.src = pub('videos', v.video_path);
       if (v.music_url) { post.music = v.music_url; post.mt = v.music_title || 'Sound'; post.mc = String(v.music_credit || '').replace(/[<>&"']/g, ''); }
       if (v.sound_id && SD[v.sound_id]) { const q = SD[v.sound_id]; post.sid = q.id; post.surl = pub('sounds', q.audio_path); post.sname = 'Original sound · ' + String(q.artist).replace(/[<>&"']/g, ''); }
-      post.mv = v.music_vol ?? 0.8; post.ov = v.orig_vol ?? 1; post.ms = v.music_start || 0;
+      post.mv = v.music_vol ?? 0.8; post.ov = v.orig_vol ?? 1; post.ms = v.music_start || 0; post.av = AV[v.user_id] || ''; post.vf = !!VF[v.user_id];
       post.files = v.kind === 'photo' ? [...(v.image_paths || []).map(x => ['media', x]), ...(v.music_path ? [['media', v.music_path]] : [])] : [['videos', v.video_path]];
       return post;
     });
@@ -148,8 +148,8 @@
   }
   async function load() {
     const { data, error } = await sb.from('bp_videos').select('*').order('created_at', { ascending: false }).limit(100);
-    if (error) { note('Couldn’t load posts: ' + error.message); return; }
-    if (!data.length) return; // keep demo posts until real ones exist
+    if (error) { note('Couldn’t load posts: ' + error.message); renderFeed(); return; }
+    if (!data.length) { renderFeed(); return; } // demo posts until real ones exist
     liked.clear(); saved.clear(); followed.clear();
     if (me) {
       const [l, s, f] = await Promise.all([
@@ -293,10 +293,12 @@
     const over = f.size > MAXMB * 1048576, mb = (f.size / 1048576).toFixed(0);
     if (over && !(window.BPUpload && confirm(`This video is ${mb} MB and the limit is ${MAXMB} MB.\n\nCompress it now? This takes about as long as the video itself (${fmt(dsec)}), and you need to keep this page open.`)))
       return fail(`This video is ${mb} MB. The limit is ${MAXMB} MB. Trim or compress it and try again.`);
+    let opt = false;
+    if (!over && !ED && window.BPUpload && dsec <= 240 && f.size * 8 / dsec / 1e6 > 5) opt = confirm('This video is very high quality, so it may stutter on other people’s phones.\n\nOptimize it first? This takes about as long as the video (' + fmt(dsec) + ').\n\nTap Cancel to post it as it is.');
     start('Preparing…');
     let sid = null;
     try {
-      if (over) {
+      if (over || opt) {
         m.textContent = 'Compressing… 0%';
         const out = await BPUpload.compress(f, MAXMB * 0.9, pc => { m.textContent = 'Compressing… ' + pc + '%'; });
         if (out.blob.size > MAXMB * 1048576) throw new Error('Still over the ' + MAXMB + ' MB limit after compressing. Please trim the video.');
@@ -304,7 +306,7 @@
       }
       await ensureProfile();
       m.textContent = 'Uploading… 0%';
-      const ext = over ? (type.includes('mp4') ? 'mp4' : 'webm') : (fname.split('.').pop() || 'mp4');
+      const ext = (over || opt) ? (type.includes('mp4') ? 'mp4' : 'webm') : (fname.split('.').pop() || 'mp4');
       const path = await up('videos', file, (fname.replace(/\.[^.]+$/, '') + '.' + ext).replace(/[^\w.-]/g, '_'), type, pc => { m.textContent = 'Uploading… ' + pc + '%'; });
       if (window.BPMp3 && $('#asd') && $('#asd').checked && dsec <= 180) {
         let sp = null;
@@ -322,5 +324,6 @@
     finish();
   };
 
+  $('#feed').innerHTML = '<article class="post skel"></article>'; // loading placeholder
   load();
 })();

@@ -562,3 +562,76 @@ begin
   on conflict (user_id) do nothing;
   return new;
 end $$;
+
+-- 17. Blueprints: remember which steps of a guide each person has finished
+create table if not exists public.bp_progress (
+  user_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  video_id uuid not null references public.bp_videos(id) on delete cascade,
+  done int[] not null default '{}',
+  updated_at timestamptz not null default now(),
+  primary key (user_id, video_id)
+);
+alter table public.bp_progress enable row level security;
+drop policy if exists "progress read own" on public.bp_progress;
+drop policy if exists "progress add own" on public.bp_progress;
+drop policy if exists "progress change own" on public.bp_progress;
+drop policy if exists "progress delete own" on public.bp_progress;
+create policy "progress read own" on public.bp_progress for select to authenticated using (user_id = (select auth.uid()));
+create policy "progress add own" on public.bp_progress for insert to authenticated with check (user_id = (select auth.uid()));
+create policy "progress change own" on public.bp_progress for update to authenticated using (user_id = (select auth.uid()));
+create policy "progress delete own" on public.bp_progress for delete to authenticated using (user_id = (select auth.uid()));
+
+-- 18. Verified badge (approved by admins) and the super admin gets it now
+alter table public.bp_profiles add column if not exists verified boolean not null default false;
+alter table public.bp_profiles drop constraint if exists bp_dn_no_badge;
+alter table public.bp_profiles add constraint bp_dn_no_badge check (display_name is null or display_name !~ '[✓✔☑]') not valid;
+
+-- people can never set their own badge or ban flag when creating a profile
+drop policy if exists "own profile insert" on public.bp_profiles;
+create policy "own profile insert" on public.bp_profiles for insert to authenticated
+  with check (id = (select auth.uid()) and verified = false and banned = false);
+
+create table if not exists public.bp_verify_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references public.bp_profiles(id) on delete cascade,
+  category text not null check (char_length(category) <= 40),
+  reason text not null check (char_length(reason) between 10 and 300),
+  links text check (char_length(links) <= 200),
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  note text,
+  handled_by uuid,
+  handled_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists bp_verify_one_pending on public.bp_verify_requests (user_id) where status = 'pending';
+alter table public.bp_verify_requests enable row level security;
+drop policy if exists "verify read" on public.bp_verify_requests;
+drop policy if exists "verify add own" on public.bp_verify_requests;
+create policy "verify read" on public.bp_verify_requests for select to authenticated using (user_id = (select auth.uid()) or public.bp_is_admin());
+create policy "verify add own" on public.bp_verify_requests for insert to authenticated with check (user_id = (select auth.uid()) and status = 'pending' and public.bp_ok());
+
+create or replace function public.bp_set_verified(uid uuid, flag boolean) returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.bp_is_admin() then raise exception 'Not allowed'; end if;
+  update public.bp_profiles set verified = flag where id = uid;
+end $$;
+
+create or replace function public.bp_review_verification(req uuid, approve boolean, p_note text default null) returns void language plpgsql security definer set search_path = '' as $$
+declare r public.bp_verify_requests;
+begin
+  if not public.bp_is_admin() then raise exception 'Not allowed'; end if;
+  select * into r from public.bp_verify_requests where id = req and status = 'pending';
+  if not found then raise exception 'Request not found'; end if;
+  update public.bp_verify_requests set status = case when approve then 'approved' else 'rejected' end,
+    note = left(p_note, 200), handled_by = (select auth.uid()), handled_at = now() where id = req;
+  if approve then update public.bp_profiles set verified = true where id = r.user_id; end if;
+  insert into public.bp_notifications (user_id, actor_id, type, body)
+  values (r.user_id, (select auth.uid()), 'verify',
+    case when approve then 'Congratulations! Your account is now verified.' else 'Your verification request was not approved.' || coalesce(' ' || left(p_note, 120), '') end);
+end $$;
+
+alter table public.bp_notifications drop constraint if exists bp_notifications_type_check;
+alter table public.bp_notifications add constraint bp_notifications_type_check check (type in ('live','comment','follow','view','like','verify'));
+
+-- the super admin (everyone in bp_admins) is verified now
+update public.bp_profiles set verified = true where id in (select user_id from public.bp_admins);

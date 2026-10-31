@@ -1,0 +1,59 @@
+/* Blueprint look and feel: cleaner header, icon navigation, smoother controls, nicer cards and guides. */
+body{-webkit-tap-highlight-color:transparent}
+button{transition:transform .12s ease,background-color .2s ease,opacity .2s}
+button:active{transform:scale(.96)}
+a{-webkit-tap-highlight-color:transparent}
+
+/* Header */
+header{padding:6px 14px;gap:10px;position:relative;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px)}
+header>b{font-size:18px;letter-spacing:-.4px}
+header .tabs{margin:0 auto;gap:22px}
+header .tabs span{font-size:15px;padding:6px 2px;border-bottom:2px solid transparent}
+header .tabs .on{border-bottom-color:var(--blue)}
+header button{color:var(--fg)}
+#bell,#mbtn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0!important}
+#bell:active,#mbtn:active{background:var(--card)}
+@media (max-width:430px){header>b{display:none}}
+
+/* Feed: avatar with follow badge, calmer buttons, motion only on the post you are watching */
+.rail{gap:14px;bottom:96px}
+.rail button{background:rgba(0,0,0,.28);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:11px;font-weight:600}
+.avw{position:relative;margin-bottom:8px}
+.av2{width:46px;height:46px;border-radius:50%;border:2px solid #fff;background:var(--blue);display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:800;color:#fff;font-size:18px;cursor:pointer}
+.av2 img{width:100%;height:100%;object-fit:cover}
+.rail .fplus{position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#ff3b5c;color:#fff;border:0;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;backdrop-filter:none}
+.sndrow .mq,.disc{animation:none}
+.post.cur .sndrow .mq{animation:mq 11s linear infinite}
+.post.cur .disc{animation:spin 5s linear infinite}
+.post.paused .disc,.post.paused .mq{animation-play-state:paused}
+.info{padding-bottom:20px}
+.info h3{font-size:16px;line-height:1.3}
+.skel{background:linear-gradient(110deg,var(--card) 30%,var(--line) 50%,var(--card) 70%);background-size:200% 100%;animation:shim 1.3s linear infinite}
+@keyframes shim{to{background-position:-200% 0}}
+
+/* Sheets and cards */
+.sheet>div{animation:slideup .22s ease-out;border-radius:22px 22px 0 0}
+@keyframes slideup{from{transform:translateY(28px);opacity:0}}
+.card{border-radius:16px}
+.btn{border-radius:14px;min-height:44px}
+input,textarea,select{border-radius:12px}
+.msg{min-height:20px}
+
+/* Blueprints tab */
+.gseg{display:flex;gap:6px;overflow-x:auto;margin:10px 0 4px}
+.gseg button,.gchips span{white-space:nowrap;border:0;border-radius:99px;padding:8px 14px;font-size:13px;font-weight:600;background:var(--card);color:var(--fg);cursor:pointer}
+.gseg button.on,.gchips span.on{background:var(--blue);color:#fff}
+.gchips{display:flex;gap:6px;overflow-x:auto;margin:6px 0 10px}
+.gcard{display:flex;gap:12px;background:var(--card);border-radius:16px;padding:10px;margin-bottom:10px;cursor:pointer}
+.gth{position:relative;overflow:hidden;width:76px;min-width:76px;height:96px;border-radius:12px;background:var(--blue)}
+.gth video,.gth img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.gin{display:flex;flex-direction:column;gap:4px;min-width:0;justify-content:center}
+.gin b{font-size:15px;line-height:1.25}.gin small{color:var(--mut)}
+.gbar{height:6px;background:var(--line);border-radius:9px;overflow:hidden}.gbar i{display:block;height:100%;background:linear-gradient(90deg,#1e6bff,#00b8ff)}
+.gstep{display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--card);border-radius:14px;margin-bottom:8px;font-size:15px;cursor:pointer}
+.gstep input{width:22px;height:22px;margin:1px 0 0;padding:0;flex:none;accent-color:#1e6bff}
+.gstep b{color:var(--blue);margin-right:4px}.gstep.on span{text-decoration:line-through;color:var(--mut)}
+.gempty{text-align:center;color:var(--mut);padding:30px 10px;font-size:14px}
+
+/* Verified badge */
+.vb{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#1e6bff;color:#fff;font-size:10px;font-weight:800;margin-left:4px;vertical-align:middle;line-height:1}

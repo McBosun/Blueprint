@@ -12,7 +12,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 7. Fill in the [brackets] in `terms.html` and `privacy.html` and have a lawyer review them.
 
 ## Files
-index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, blueprint-sounds.js, blueprint-editor.js, blueprint-mp3.js, blueprint-explore.js, debug.html, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
+index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, blueprint-sounds.js, blueprint-editor.js, blueprint-mp3.js, blueprint-explore.js, blueprint-guides.js, blueprint-verify.js, blueprint-ui.css, debug.html, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
 
 ## Optional config.js settings
 ```js
@@ -37,7 +37,7 @@ TURN relays are sold by services such as Metered, Twilio or Cloudflare, or you c
 
 ## Install as an app (PWA)
 Open the site on a phone: Android Chrome offers Install app; on iPhone use Safari > Share > Add to Home Screen. Me > Settings > Account and help has an Install button too.
-When you release an update, change the version number (20261030f) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
+When you release an update, change the version number (20261030h) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
 Store listings later: Android via PWABuilder or Bubblewrap (Google Play developer account), iPhone via a Capacitor wrapper (Apple Developer account and App Review; user-generated content apps need reporting, blocking and moderation, which Blueprint has).
 
 ## Phone alerts (push) setup
@@ -80,3 +80,12 @@ If config.js has a mistake the app falls back to demo mode (no real videos or pr
 - Sign in and Create account are separate screens. Sign-up asks for full name, username, email, date of birth (private), country and interests (optional), password twice, and agreement to the terms. People under 18 must tick a parent or guardian box; under 16 cannot join (change `minAge` in config.js to adjust the client check, and the 16 in section 16 of update-all.sql).
 - Forgot password sends an email link that comes back to your site and asks for a new password. In Supabase > Authentication > URL Configuration, your site URL must be in Redirect URLs.
 - Supabase's built-in email sender has a very small hourly limit. Before real users arrive, add your own email service (Authentication > SMTP Settings) with Resend, Brevo or similar, so confirmation and reset emails are not blocked.
+
+## Blueprints tab
+Guides are posts whose caption has numbered steps (1. 2. 3.). The tab has Discover, Continue, Saved and Mine, category chips and search. Each guide opens a checklist with progress that is remembered per person (bp_progress). "Make one" opens the post sheet with a steps template.
+
+## Smooth playback
+The feed uses two shared video players (current and next). The next video loads only after the current one has buffered ahead. Music from a sound plays only while its video is actually playing. High quality uploads can be optimized (resized to 1280 pixels, about 2.5 Mbps) before posting.
+
+## Verified badge
+Everyone in `bp_admins` is verified automatically when update-all.sql runs. Other people apply in Me > Settings > Get verified; admins review under Settings > Verification requests (approve, decline with a reason, or verify/remove a username directly). Badges cannot be set by users. Display names cannot contain tick symbols.

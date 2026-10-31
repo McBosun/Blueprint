@@ -92,9 +92,9 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
   $('#hcb').onclick = async () => {
     $('#hc').classList.add('on'); const box = $('#hcl'); box.innerHTML = 'Checking…';
     const out = [], add = (name, res) => out.push([name, res]);
-    const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins', 'bp_notif_prefs', 'bp_push_subs', 'bp_sounds', 'bp_private'];
+    const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins', 'bp_notif_prefs', 'bp_push_subs', 'bp_sounds', 'bp_private', 'bp_progress', 'bp_verify_requests'];
     for (const t of tables) { const r = await sb.from(t).select('*', { count: 'exact', head: true }); add('Table ' + t, r.error ? r.error.message : true); }
-    const cols = [['bp_videos', 'kind,image_paths,music_path,music_title,allow_download,music_url,music_credit,music_vol,orig_vol,music_start,sound_id'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
+    const cols = [['bp_videos', 'kind,image_paths,music_path,music_title,allow_download,music_url,music_credit,music_vol,orig_vol,music_start,sound_id'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at,verified'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
     for (const [t, c] of cols) { const r = await sb.from(t).select(c).limit(1); add(`Columns in ${t}`, r.error ? r.error.message : true); }
     for (const b of ['videos', 'media', 'avatars', 'sounds']) { const r = await sb.storage.from(b).list('', { limit: 1 }); add('Storage bucket ' + b, r.error ? r.error.message : true); }
     if (me()) {
