@@ -635,3 +635,67 @@ alter table public.bp_notifications add constraint bp_notifications_type_check c
 
 -- the super admin (everyone in bp_admins) is verified now
 update public.bp_profiles set verified = true where id in (select user_id from public.bp_admins);
+
+-- 19. Sponsored posts (ads), managed by admins
+create table if not exists public.bp_ads (
+  id uuid primary key default gen_random_uuid(),
+  advertiser text not null check (char_length(advertiser) between 1 and 60),
+  headline text not null check (char_length(headline) between 1 and 80),
+  body text check (char_length(body) <= 200),
+  cta text not null default 'Learn more' check (char_length(cta) <= 20),
+  link_url text not null check (link_url ~ '^https://[^ ]+$' and char_length(link_url) <= 500),
+  media_kind text not null check (media_kind in ('video','image')),
+  media_path text not null,
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz,
+  status text not null default 'active' check (status in ('draft','active','paused','ended')),
+  max_impressions int check (max_impressions is null or max_impressions > 0),
+  every_n int not null default 6 check (every_n between 3 and 20),
+  adult_only boolean not null default false,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now()
+);
+alter table public.bp_ads enable row level security;
+drop policy if exists "ads admin all" on public.bp_ads;
+create policy "ads admin all" on public.bp_ads for all to authenticated using (public.bp_is_admin()) with check (public.bp_is_admin());
+
+create table if not exists public.bp_ad_events (
+  id bigint generated always as identity primary key,
+  ad_id uuid not null references public.bp_ads(id) on delete cascade,
+  kind text not null check (kind in ('view','click')),
+  viewer_key text not null check (char_length(viewer_key) between 4 and 64),
+  bucket timestamptz not null default date_trunc('hour', now()),
+  created_at timestamptz not null default now()
+);
+create unique index if not exists bp_ad_event_once on public.bp_ad_events (ad_id, kind, viewer_key, bucket);
+alter table public.bp_ad_events enable row level security;
+drop policy if exists "ad events insert" on public.bp_ad_events;
+create policy "ad events insert" on public.bp_ad_events for insert to anon, authenticated
+  with check (exists (select 1 from public.bp_ads a where a.id = ad_id and a.status = 'active'));
+
+create or replace function public.bp_is_adult() returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((select birth_date <= (current_date - interval '18 years') from public.bp_private where user_id = (select auth.uid())), false) $$;
+
+create or replace function public.bp_active_ads() returns setof public.bp_ads language sql stable security definer set search_path = '' as $$
+  select a.* from public.bp_ads a
+  where a.status = 'active' and a.starts_at <= now() and (a.ends_at is null or a.ends_at > now())
+    and (not a.adult_only or public.bp_is_adult())
+    and (a.max_impressions is null or (select count(*) from public.bp_ad_events e where e.ad_id = a.id and e.kind = 'view') < a.max_impressions)
+  order by a.created_at desc limit 20 $$;
+
+create or replace function public.bp_ad_stats() returns table (ad_id uuid, views bigint, clicks bigint) language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.bp_is_admin() then raise exception 'Not allowed'; end if;
+  return query select a.id, count(*) filter (where e.kind = 'view'), count(*) filter (where e.kind = 'click')
+    from public.bp_ads a left join public.bp_ad_events e on e.ad_id = a.id group by a.id;
+end $$;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('ads', 'ads', true, 31457280, array['video/*','image/*'])
+on conflict (id) do update set file_size_limit = 31457280, allowed_mime_types = array['video/*','image/*'];
+drop policy if exists "bp ads read" on storage.objects;
+drop policy if exists "bp ads admin add" on storage.objects;
+drop policy if exists "bp ads admin delete" on storage.objects;
+create policy "bp ads read" on storage.objects for select using (bucket_id = 'ads');
+create policy "bp ads admin add" on storage.objects for insert to authenticated with check (bucket_id = 'ads' and public.bp_is_admin());
+create policy "bp ads admin delete" on storage.objects for delete to authenticated using (bucket_id = 'ads' and public.bp_is_admin());

@@ -12,7 +12,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 7. Fill in the [brackets] in `terms.html` and `privacy.html` and have a lawyer review them.
 
 ## Files
-index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, blueprint-sounds.js, blueprint-editor.js, blueprint-mp3.js, blueprint-explore.js, blueprint-guides.js, blueprint-verify.js, blueprint-ui.css, debug.html, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
+index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, blueprint-sounds.js, blueprint-editor.js, blueprint-mp3.js, blueprint-explore.js, blueprint-guides.js, blueprint-verify.js, blueprint-ads.js, blueprint-ui.css, debug.html, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
 
 ## Optional config.js settings
 ```js
@@ -37,7 +37,7 @@ TURN relays are sold by services such as Metered, Twilio or Cloudflare, or you c
 
 ## Install as an app (PWA)
 Open the site on a phone: Android Chrome offers Install app; on iPhone use Safari > Share > Add to Home Screen. Me > Settings > Account and help has an Install button too.
-When you release an update, change the version number (20261030h) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
+When you release an update, change the version number (20261101a) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
 Store listings later: Android via PWABuilder or Bubblewrap (Google Play developer account), iPhone via a Capacitor wrapper (Apple Developer account and App Review; user-generated content apps need reporting, blocking and moderation, which Blueprint has).
 
 ## Phone alerts (push) setup
@@ -89,3 +89,6 @@ The feed uses two shared video players (current and next). The next video loads 
 
 ## Verified badge
 Everyone in `bp_admins` is verified automatically when update-all.sql runs. Other people apply in Me > Settings > Get verified; admins review under Settings > Verification requests (approve, decline with a reason, or verify/remove a username directly). Badges cannot be set by users. Display names cannot contain tick symbols.
+
+## Sponsored posts (ads)
+Admins create ads in Me > Settings > Ads manager: advertiser, headline, optional text, button text, an https link, a video or picture, dates, how often to appear (every 3 to 20 posts), an optional view cap and an adults-only switch. Ads are labelled "Sponsored", are not personalised, and the manager shows views, taps and tap rate. To sell a slot, agree the price with the brand, take payment yourself (for example a Paystack invoice), then create the ad. Check what each brand is advertising before you publish.
