@@ -12,7 +12,7 @@ Video and photo social app: video uploads up to 20 minutes, photo posts with mus
 7. Fill in the [brackets] in `terms.html` and `privacy.html` and have a lawyer review them.
 
 ## Files
-index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, blueprint-sounds.js, blueprint-editor.js, blueprint-mp3.js, blueprint-explore.js, blueprint-guides.js, blueprint-verify.js, blueprint-ads.js, blueprint-ui.css, debug.html, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
+index.html, blueprint-profile.js, blueprint-supabase.js, blueprint-extra.js, blueprint-messages.js, blueprint-sound.js, blueprint-upload.js, blueprint-feed.js, blueprint-safety.js, blueprint-settings.js, blueprint-install.js, blueprint-notify.js, blueprint-sounds.js, blueprint-editor.js, blueprint-mp3.js, blueprint-explore.js, blueprint-guides.js, blueprint-verify.js, blueprint-ads.js, blueprint-gifts.js, paystack.ts, blueprint-ui.css, debug.html, send-push.ts, vapid.html, manifest.json, sw.js, icons (icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-48.png), config.js, schema.sql, update-all.sql, terms.html, privacy.html, TESTING.md
 
 ## Optional config.js settings
 ```js
@@ -37,7 +37,7 @@ TURN relays are sold by services such as Metered, Twilio or Cloudflare, or you c
 
 ## Install as an app (PWA)
 Open the site on a phone: Android Chrome offers Install app; on iPhone use Safari > Share > Add to Home Screen. Me > Settings > Account and help has an Install button too.
-When you release an update, change the version number (20261101a) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
+When you release an update, change the version number (20261101b) in `index.html` (meta and script tags), `blueprint-settings.js` and `sw.js` so phones pick it up.
 Store listings later: Android via PWABuilder or Bubblewrap (Google Play developer account), iPhone via a Capacitor wrapper (Apple Developer account and App Review; user-generated content apps need reporting, blocking and moderation, which Blueprint has).
 
 ## Phone alerts (push) setup
@@ -92,3 +92,7 @@ Everyone in `bp_admins` is verified automatically when update-all.sql runs. Othe
 
 ## Sponsored posts (ads)
 Admins create ads in Me > Settings > Ads manager: advertiser, headline, optional text, button text, an https link, a video or picture, dates, how often to appear (every 3 to 20 posts), an optional view cap and an adults-only switch. Ads are labelled "Sponsored", are not personalised, and the manager shows views, taps and tap rate. To sell a slot, agree the price with the brand, take payment yourself (for example a Paystack invoice), then create the ad. Check what each brand is advertising before you publish.
+
+## Coins, gifts and payouts (Paystack)
+Adults (18+) buy coins with Paystack, then send gifts (Rose, Heart, Talking Drum, Fire, Crown, Cash Blaster, Lion, Universe) on live streams. The animation plays for everyone watching. The creator earns 50% of the gift value in naira (change `creator_share`, `coin_value_kobo` and `min_payout_kobo` in the bp_money_config table). Creators ask to cash out in Me > Settings > Coins and earnings; admins pay them from the Paystack dashboard or their bank, then mark the request paid under Payout requests.
+Setup: 1) put `paystackKey: 'pk_test_...'` (public key) in config.js. 2) Deploy `paystack.ts` as an Edge Function named `paystack` with Verify JWT off. 3) Add the secret `PAYSTACK_SECRET_KEY` (your sk_test key) in Edge Functions > Secrets. 4) In Paystack > Settings > API Keys & Webhooks set the Test Webhook URL to https://YOUR-REF.supabase.co/functions/v1/paystack. 5) Run update-all.sql. Test with the test cards shown in the Paystack dashboard. Switch to live keys only after a registered business and a lawyer have checked the terms.

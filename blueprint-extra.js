@@ -159,6 +159,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     const ch = sb.channel('live:' + r.data.id, { config: { broadcast: { self: true }, presence: { key: me().id } } });
     const send = (event, payload) => ch.send({ type: 'broadcast', event, payload });
     const h = H = { id: r.data.id, ch, peers: {}, send };
+    if (window.BPGifts) BPGifts.watch(r.data.id, true);
     ch.on('broadcast', { event: 'join' }, async ({ payload }) => {
       if (h.peers[payload.from]) h.peers[payload.from].close();
       if (Object.keys(h.peers).length >= (C.maxViewers || 8)) return send('full', { to: payload.from });
@@ -179,7 +180,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     BP.note('You’re live. Followers were notified.', true); loadLives();
   }
   function endBroadcast() {
-    const h = H; if (!h) return; H = null;
+    const h = H; if (!h) return; H = null; if (window.BPGifts) BPGifts.unwatch();
     clearInterval(h.hb); h.send('end', {}); Object.values(h.peers).forEach(pc => pc.close());
     sb.from('bp_lives').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', h.id).then(() => {});
     setTimeout(() => { sb.removeChannel(h.ch); loadLives(); }, 600);
@@ -218,6 +219,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     const pc = new RTCPeerConnection({ iceServers: ICE }), v = $('#vv');
     const send = (event, payload) => ch.send({ type: 'broadcast', event, payload });
     V = { ch, pc, send, chat: [] };
+    if (window.BPGifts) BPGifts.watch(liveId, false);
     pc.ontrack = e => { v.srcObject = e.streams[0]; $('#vs').textContent = ''; v.muted = false; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); $('#vs').textContent = 'Tap the video to unmute'; }); };
     pc.onicecandidate = e => e.candidate && send('ice', { to: 'host', from: myId, c: e.candidate });
     ch.on('broadcast', { event: 'offer' }, async ({ payload }) => {
@@ -235,7 +237,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     V.t = setTimeout(() => { if (V && !v.srcObject && !$('#vs').textContent.includes('full')) $('#vs').textContent = 'Still connecting. The host’s network may block direct connections.'; }, 15000);
   }
   function closeViewer() {
-    if (!V) return; clearTimeout(V.retry); clearTimeout(V.t); V.pc.close(); sb.removeChannel(V.ch); V = null;
+    if (!V) return; if (window.BPGifts) BPGifts.unwatch(); clearTimeout(V.retry); clearTimeout(V.t); V.pc.close(); sb.removeChannel(V.ch); V = null;
     $('#vv').srcObject = null; $('#vw').classList.remove('on');
   }
   $('#vx').onclick = closeViewer;
@@ -249,7 +251,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
 
   // ---------- Notifications and profile views ----------
   let notes = [], noteCh = null, tabN = 'n';
-  const text = { live: x => `${x.u} is live: ${esc(x.body || '')}`, comment: x => `${x.u} commented: “${esc(x.body || '')}”`, follow: x => `${x.u} started following you`, like: x => `${x.u} liked your post`, verify: x => esc(x.body || 'Your verification was reviewed'), view: x => `${x.u} viewed your profile` };
+  const text = { live: x => `${x.u} is live: ${esc(x.body || '')}`, comment: x => `${x.u} commented: “${esc(x.body || '')}”`, follow: x => `${x.u} started following you`, like: x => `${x.u} liked your post`, gift: x => `${x.u} sent you ${esc(x.body || 'a gift')}`, payout: x => esc(x.body || 'Payout update'), verify: x => esc(x.body || 'Your verification was reviewed'), view: x => `${x.u} viewed your profile` };
   async function loadNotes() {
     if (!me()) { $('#bd').style.display = 'none'; return; }
     const r = await sb.from('bp_notifications').select('*').order('created_at', { ascending: false }).limit(50);
@@ -289,7 +291,7 @@ ${p.avatar_url ? `<img class='av' src='${esc(p.avatar_url)}' alt=''>` : "<svg cl
     const x = notes.find(n => n.id === row.dataset.i); if (!x) return;
     if (x.type === 'comment' || x.type === 'like') openPost(x.video_id);
     else if (x.type === 'live') { const l = await sb.from('bp_lives').select('id,title,status').eq('id', x.live_id).maybeSingle(); l.data && l.data.status === 'live' ? openViewer(l.data.id, x.u, l.data.title) : BP.note('That live has ended.'); }
-    else if (x.type === 'verify') document.querySelector('nav [data-v="me"]').click();
+    else if (x.type === 'verify' || x.type === 'gift' || x.type === 'payout') document.querySelector('nav [data-v="me"]').click();
     else openProfile(x.actor_id);
   };
   function startNotes() {

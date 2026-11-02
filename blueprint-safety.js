@@ -92,7 +92,7 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
   $('#hcb').onclick = async () => {
     $('#hc').classList.add('on'); const box = $('#hcl'); box.innerHTML = 'Checking…';
     const out = [], add = (name, res) => out.push([name, res]);
-    const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins', 'bp_notif_prefs', 'bp_push_subs', 'bp_sounds', 'bp_private', 'bp_progress', 'bp_verify_requests', 'bp_ads'];
+    const tables = ['bp_profiles', 'bp_videos', 'bp_likes', 'bp_saves', 'bp_comments', 'bp_lives', 'bp_follows', 'bp_notifications', 'bp_profile_views', 'bp_messages', 'bp_blocks', 'bp_reports', 'bp_views', 'bp_admins', 'bp_notif_prefs', 'bp_push_subs', 'bp_sounds', 'bp_private', 'bp_progress', 'bp_verify_requests', 'bp_ads', 'bp_wallets', 'bp_gifts', 'bp_coin_packs', 'bp_gift_log', 'bp_payments', 'bp_payout_requests'];
     for (const t of tables) { const r = await sb.from(t).select('*', { count: 'exact', head: true }); add('Table ' + t, r.error ? r.error.message : true); }
     const cols = [['bp_videos', 'kind,image_paths,music_path,music_title,allow_download,music_url,music_credit,music_vol,orig_vol,music_start,sound_id'], ['bp_profiles', 'display_name,bio,avatar_url,share_views,dm_policy,banned,terms_accepted_at,verified'], ['bp_lives', 'last_seen'], ['bp_reports', 'target_type,video_id,comment_id,status']];
     for (const [t, c] of cols) { const r = await sb.from(t).select(c).limit(1); add(`Columns in ${t}`, r.error ? r.error.message : true); }
@@ -107,6 +107,7 @@ ${x.video_id ? `<div>Post: ${V[x.video_id] ? esc(V[x.video_id].title) : '(alread
     add('Browser: recording replays', window.MediaRecorder ? true : 'No MediaRecorder. Replays and compression won’t work.');
     add('Resumable uploads loaded', window.tus ? true : 'tus library missing. Large uploads use the basic method.');
     add('Phone alerts key (vapidKey in config.js)', C.vapidKey ? true : 'Not set. Phone alerts stay off.');
+    add('Payments (paystackKey in config.js)', C.paystackKey ? true : 'Not set. Coins and gifts stay off.');
     add('Free music search (jamendoId in config.js)', C.jamendoId ? true : 'Not set. Only Blueprint Sounds are available.');
     add('Live relay (TURN) set up', C.iceServers && C.iceServers.some(x => String(x.urls).startsWith('turn')) ? true : 'Not set. Some mobile networks will fail to connect to lives.');
     const bad = out.filter(x => x[1] !== true);

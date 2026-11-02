@@ -699,3 +699,188 @@ drop policy if exists "bp ads admin delete" on storage.objects;
 create policy "bp ads read" on storage.objects for select using (bucket_id = 'ads');
 create policy "bp ads admin add" on storage.objects for insert to authenticated with check (bucket_id = 'ads' and public.bp_is_admin());
 create policy "bp ads admin delete" on storage.objects for delete to authenticated using (bucket_id = 'ads' and public.bp_is_admin());
+
+-- 20. Coins, gifts, earnings and payouts (Paystack)
+create table if not exists public.bp_money_config (key text primary key, value numeric not null);
+insert into public.bp_money_config (key, value) values ('creator_share', 0.5), ('coin_value_kobo', 500), ('min_payout_kobo', 500000) on conflict (key) do nothing;
+alter table public.bp_money_config enable row level security;
+drop policy if exists "money config admin" on public.bp_money_config;
+create policy "money config admin" on public.bp_money_config for all to authenticated using (public.bp_is_admin()) with check (public.bp_is_admin());
+
+create table if not exists public.bp_wallets (
+  user_id uuid primary key references public.bp_profiles(id) on delete cascade,
+  coins bigint not null default 0 check (coins >= 0),
+  earnings_kobo bigint not null default 0 check (earnings_kobo >= 0),
+  updated_at timestamptz not null default now()
+);
+alter table public.bp_wallets enable row level security;
+drop policy if exists "wallet read own" on public.bp_wallets;
+create policy "wallet read own" on public.bp_wallets for select to authenticated using (user_id = (select auth.uid()));
+
+create table if not exists public.bp_coin_packs (id text primary key, label text not null, coins int not null check (coins > 0), price_kobo int not null check (price_kobo >= 10000), active boolean not null default true);
+insert into public.bp_coin_packs (id, label, coins, price_kobo) values
+  ('p50', '50 coins', 50, 25000), ('p100', '100 coins', 100, 50000), ('p500', '500 coins + 25 bonus', 525, 250000),
+  ('p1000', '1,000 coins + 100 bonus', 1100, 500000), ('p5000', '5,000 coins + 750 bonus', 5750, 2500000)
+on conflict (id) do update set label = excluded.label, coins = excluded.coins, price_kobo = excluded.price_kobo;
+alter table public.bp_coin_packs enable row level security;
+drop policy if exists "packs read" on public.bp_coin_packs;
+drop policy if exists "packs admin" on public.bp_coin_packs;
+create policy "packs read" on public.bp_coin_packs for select using (active);
+create policy "packs admin" on public.bp_coin_packs for all to authenticated using (public.bp_is_admin()) with check (public.bp_is_admin());
+
+create table if not exists public.bp_gifts (id text primary key, name text not null, coins int not null check (coins > 0), emoji text not null, effect text not null, sort int not null default 0, active boolean not null default true);
+insert into public.bp_gifts (id, name, coins, emoji, effect, sort) values
+  ('rose', 'Rose', 1, '🌹', 'rose', 1), ('heart', 'Heart', 5, '❤️', 'heart', 2), ('drum', 'Talking Drum', 20, '🥁', 'drum', 3),
+  ('fire', 'Fire', 30, '🔥', 'fire', 4), ('crown', 'Crown', 99, '👑', 'crown', 5), ('cash', 'Cash Blaster', 199, '🪙', 'cash', 6),
+  ('lion', 'Lion', 499, '🦁', 'lion', 7), ('universe', 'Universe', 1999, '🌌', 'universe', 8)
+on conflict (id) do update set name = excluded.name, coins = excluded.coins, emoji = excluded.emoji, effect = excluded.effect, sort = excluded.sort;
+alter table public.bp_gifts enable row level security;
+drop policy if exists "gifts read" on public.bp_gifts;
+drop policy if exists "gifts admin" on public.bp_gifts;
+create policy "gifts read" on public.bp_gifts for select using (active);
+create policy "gifts admin" on public.bp_gifts for all to authenticated using (public.bp_is_admin()) with check (public.bp_is_admin());
+
+create table if not exists public.bp_payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.bp_profiles(id) on delete cascade,
+  reference text not null unique,
+  pack_id text not null references public.bp_coin_packs(id),
+  amount_kobo int not null,
+  coins int not null,
+  status text not null default 'pending' check (status in ('pending','paid','failed')),
+  created_at timestamptz not null default now(),
+  paid_at timestamptz
+);
+alter table public.bp_payments enable row level security;
+drop policy if exists "payments read own" on public.bp_payments;
+create policy "payments read own" on public.bp_payments for select to authenticated using (user_id = (select auth.uid()) or public.bp_is_admin());
+
+create table if not exists public.bp_gift_log (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references public.bp_profiles(id) on delete cascade,
+  receiver_id uuid not null references public.bp_profiles(id) on delete cascade,
+  gift_id text not null references public.bp_gifts(id),
+  qty int not null check (qty between 1 and 99),
+  coins int not null,
+  live_id uuid references public.bp_lives(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists bp_gift_live_idx on public.bp_gift_log (live_id, created_at desc);
+alter table public.bp_gift_log enable row level security;
+drop policy if exists "gift log read" on public.bp_gift_log;
+create policy "gift log read" on public.bp_gift_log for select using (live_id is not null or sender_id = (select auth.uid()) or receiver_id = (select auth.uid()));
+do $$ begin alter publication supabase_realtime add table public.bp_gift_log; exception when others then null; end $$;
+
+create table if not exists public.bp_payout_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.bp_profiles(id) on delete cascade,
+  amount_kobo bigint not null check (amount_kobo > 0),
+  bank text not null,
+  account_number text not null check (account_number ~ '^[0-9]{10}$'),
+  account_name text not null,
+  status text not null default 'pending' check (status in ('pending','paid','rejected')),
+  note text,
+  handled_by uuid,
+  handled_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.bp_payout_requests enable row level security;
+drop policy if exists "payout read" on public.bp_payout_requests;
+create policy "payout read" on public.bp_payout_requests for select to authenticated using (user_id = (select auth.uid()) or public.bp_is_admin());
+
+alter table public.bp_notifications drop constraint if exists bp_notifications_type_check;
+alter table public.bp_notifications add constraint bp_notifications_type_check check (type in ('live','comment','follow','view','like','verify','gift','payout'));
+
+create or replace function public.bp_wallet_info() returns json language plpgsql stable security definer set search_path = '' as $$
+declare w public.bp_wallets;
+begin
+  select * into w from public.bp_wallets where user_id = (select auth.uid());
+  return json_build_object('coins', coalesce(w.coins, 0), 'earnings_kobo', coalesce(w.earnings_kobo, 0), 'adult', public.bp_is_adult(),
+    'min_payout_kobo', (select value from public.bp_money_config where key = 'min_payout_kobo'), 'share', (select value from public.bp_money_config where key = 'creator_share'));
+end $$;
+
+create or replace function public.bp_start_purchase(pack text) returns json language plpgsql security definer set search_path = '' as $$
+declare pk public.bp_coin_packs; ref text; em text; uid uuid := (select auth.uid());
+begin
+  if uid is null then raise exception 'Please sign in'; end if;
+  if not public.bp_is_adult() then raise exception 'Buying coins is for people aged 18 and over'; end if;
+  if not public.bp_ok() then raise exception 'Your account is restricted'; end if;
+  select * into pk from public.bp_coin_packs where id = pack and active;
+  if not found then raise exception 'That pack is not available'; end if;
+  ref := 'bp_' || replace(gen_random_uuid()::text, '-', '');
+  select email into em from auth.users where id = uid;
+  insert into public.bp_payments (user_id, reference, pack_id, amount_kobo, coins) values (uid, ref, pk.id, pk.price_kobo, pk.coins);
+  return json_build_object('reference', ref, 'amount_kobo', pk.price_kobo, 'coins', pk.coins, 'email', em);
+end $$;
+
+create or replace function public.bp_credit_payment(ref text, paid_kobo bigint, cur text) returns bigint language plpgsql security definer set search_path = '' as $$
+declare p public.bp_payments;
+begin
+  select * into p from public.bp_payments where reference = ref for update;
+  if not found then return -1; end if;
+  if p.status = 'paid' then return p.coins; end if;
+  if p.amount_kobo <> paid_kobo or upper(cur) <> 'NGN' then update public.bp_payments set status = 'failed' where id = p.id; return -1; end if;
+  update public.bp_payments set status = 'paid', paid_at = now() where id = p.id;
+  insert into public.bp_wallets (user_id, coins) values (p.user_id, p.coins)
+  on conflict (user_id) do update set coins = public.bp_wallets.coins + excluded.coins, updated_at = now();
+  return p.coins;
+end $$;
+revoke all on function public.bp_credit_payment(text, bigint, text) from public, anon, authenticated;
+grant execute on function public.bp_credit_payment(text, bigint, text) to service_role;
+
+create or replace function public.bp_send_gift(p_receiver uuid, p_gift text, p_live uuid default null, p_qty int default 1) returns json language plpgsql security definer set search_path = '' as $$
+declare uid uuid := (select auth.uid()); gf public.bp_gifts; total int; share numeric; unit numeric; left_ bigint; gid uuid;
+begin
+  if uid is null then raise exception 'Please sign in'; end if;
+  if uid = p_receiver then raise exception 'You can''t send a gift to yourself'; end if;
+  if not public.bp_is_adult() then raise exception 'Gifts are for people aged 18 and over'; end if;
+  if not public.bp_ok() then raise exception 'Your account is restricted'; end if;
+  if p_qty < 1 or p_qty > 99 then raise exception 'Choose 1 to 99'; end if;
+  select * into gf from public.bp_gifts where id = p_gift and active;
+  if not found then raise exception 'That gift is not available'; end if;
+  if not exists (select 1 from public.bp_profiles where id = p_receiver) then raise exception 'Unknown creator'; end if;
+  if p_live is not null and not exists (select 1 from public.bp_lives where id = p_live and host_id = p_receiver and status = 'live') then raise exception 'This live has ended'; end if;
+  if exists (select 1 from public.bp_blocks where blocker_id = p_receiver and blocked_id = uid) then raise exception 'You can''t send gifts to this person'; end if;
+  total := gf.coins * p_qty;
+  update public.bp_wallets set coins = coins - total, updated_at = now() where user_id = uid and coins >= total returning coins into left_;
+  if not found then raise exception 'Not enough coins'; end if;
+  select value into share from public.bp_money_config where key = 'creator_share';
+  select value into unit from public.bp_money_config where key = 'coin_value_kobo';
+  insert into public.bp_wallets (user_id, earnings_kobo) values (p_receiver, floor(total * unit * share)::bigint)
+  on conflict (user_id) do update set earnings_kobo = public.bp_wallets.earnings_kobo + excluded.earnings_kobo, updated_at = now();
+  insert into public.bp_gift_log (sender_id, receiver_id, gift_id, qty, coins, live_id) values (uid, p_receiver, gf.id, p_qty, total, p_live) returning id into gid;
+  insert into public.bp_notifications (user_id, actor_id, type, body) select p_receiver, uid, 'gift', gf.name || ' x' || p_qty where public.bp_pref(p_receiver, 'gift');
+  return json_build_object('coins_left', left_, 'id', gid);
+end $$;
+
+create or replace function public.bp_request_payout(p_amount bigint, p_bank text, p_account text, p_name text) returns uuid language plpgsql security definer set search_path = '' as $$
+declare uid uuid := (select auth.uid()); minp numeric; rid uuid;
+begin
+  if uid is null then raise exception 'Please sign in'; end if;
+  if not public.bp_is_adult() then raise exception 'Cash out is for people aged 18 and over'; end if;
+  if not public.bp_ok() then raise exception 'Your account is restricted'; end if;
+  select value into minp from public.bp_money_config where key = 'min_payout_kobo';
+  if p_amount < minp then raise exception 'The minimum payout is % naira', (minp / 100)::int; end if;
+  if p_account !~ '^[0-9]{10}$' then raise exception 'The account number must be 10 digits'; end if;
+  if exists (select 1 from public.bp_payout_requests where user_id = uid and status = 'pending') then raise exception 'You already have a payout waiting'; end if;
+  update public.bp_wallets set earnings_kobo = earnings_kobo - p_amount, updated_at = now() where user_id = uid and earnings_kobo >= p_amount;
+  if not found then raise exception 'Not enough earnings'; end if;
+  insert into public.bp_payout_requests (user_id, amount_kobo, bank, account_number, account_name) values (uid, p_amount, left(p_bank, 60), p_account, left(p_name, 80)) returning id into rid;
+  return rid;
+end $$;
+
+create or replace function public.bp_finish_payout(p_id uuid, p_paid boolean, p_note text default null) returns void language plpgsql security definer set search_path = '' as $$
+declare r public.bp_payout_requests;
+begin
+  if not public.bp_is_admin() then raise exception 'Not allowed'; end if;
+  select * into r from public.bp_payout_requests where id = p_id and status = 'pending' for update;
+  if not found then raise exception 'Request not found'; end if;
+  if p_paid then
+    update public.bp_payout_requests set status = 'paid', note = left(p_note, 200), handled_by = (select auth.uid()), handled_at = now() where id = p_id;
+  else
+    update public.bp_wallets set earnings_kobo = earnings_kobo + r.amount_kobo, updated_at = now() where user_id = r.user_id;
+    update public.bp_payout_requests set status = 'rejected', note = left(p_note, 200), handled_by = (select auth.uid()), handled_at = now() where id = p_id;
+  end if;
+  insert into public.bp_notifications (user_id, actor_id, type, body) values (r.user_id, (select auth.uid()), 'payout',
+    case when p_paid then 'Your payout has been sent.' else 'Your payout request was not approved and your earnings were returned.' || coalesce(' ' || left(p_note, 120), '') end);
+end $$;
