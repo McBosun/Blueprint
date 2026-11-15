@@ -7,6 +7,7 @@
   let me = (await sb.auth.getSession()).data.session?.user || null;
   sb.auth.onAuthStateChange((e, s) => { me = s?.user || null; if (e === 'PASSWORD_RECOVERY') setTimeout(() => showAuth('reset'), 250); });
   window.BP = { sb, get me() { return me; }, openAuth: m => showAuth(m), load: () => load(), loadComments: p => loadComments(p) };
+  if (window.BPR2 && window.BPR2.enabled) window.BPR2.install(sb);
 
   // Message banner
   document.body.insertAdjacentHTML('beforeend', "<div id='bpn' style='position:fixed;left:12px;right:12px;top:calc(64px + env(safe-area-inset-top,0px));z-index:30;color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;display:none'></div>");
