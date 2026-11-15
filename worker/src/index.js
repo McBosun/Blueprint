@@ -92,7 +92,24 @@ export default {
             obj = await env.MEDIA.get(objectKey(bucket, key), { range: end === undefined ? { offset } : { offset, length: end - offset + 1 } });
           }
         } else obj = await env.MEDIA.get(objectKey(bucket, key));
-        if (!obj) return response("Not found", 404, origin);
+        if (!obj) {
+          // Keep pre-migration Supabase Storage objects readable until the owner migrates them to R2.
+          const legacyPath = key.split("/").map(encodeURIComponent).join("/");
+          const legacyUrl = env.SUPABASE_URL.replace(/\\/$/, "") + "/storage/v1/object/public/" + encodeURIComponent(bucket) + "/" + legacyPath;
+          const legacyHeaders = new Headers();
+          if (rangeHeader) legacyHeaders.set("Range", rangeHeader);
+          const legacy = await fetch(legacyUrl, { method: request.method, headers: legacyHeaders });
+          if (!legacy.ok) return response("Not found", legacy.status === 404 ? 404 : legacy.status, origin);
+          const headers = new Headers(legacy.headers);
+          for (const [name, value] of Object.entries(cors(origin))) headers.set(name, value);
+          headers.set("Cache-Control", bucket === "avatars" ? "public, max-age=300" : "public, max-age=3600");
+          const downloadName = url.searchParams.get("download");
+          if (downloadName) {
+            const safeName = downloadName.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 180);
+            headers.set("Content-Disposition", 'attachment; filename="' + safeName + '"');
+          }
+          return new Response(request.method === "HEAD" ? null : legacy.body, { status: legacy.status, headers });
+        }
         const headers = new Headers(cors(origin));
         obj.writeHttpMetadata(headers);
         headers.set("ETag", obj.httpEtag);
