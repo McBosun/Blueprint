@@ -88,6 +88,11 @@ export default {
         headers.set("ETag", obj.httpEtag);
         headers.set("Accept-Ranges", "bytes");
         headers.set("Cache-Control", bucket === "avatars" ? "public, max-age=300" : "public, max-age=3600");
+        const downloadName = url.searchParams.get("download");
+        if (downloadName) {
+          const safeName = downloadName.replace(/[\\r\\n"\\\\]/g, "_").slice(0, 180);
+          headers.set("Content-Disposition", 'attachment; filename="' + safeName + '"');
+        }
         if (rangeHeader && obj.range) {
           const start = obj.range.offset || 0, length = obj.range.length || obj.size;
           headers.set("Content-Range", `bytes ${start}-${start + length - 1}/${obj.size}`);
@@ -98,10 +103,26 @@ export default {
 
       const bucket = url.searchParams.get("bucket") || "";
       const key = url.searchParams.get("key") || "";
-      if (!BUCKETS.has(bucket) || !safeKey(key)) return json({ error: "Invalid bucket or object key." }, 400, origin);
+      const prefix = url.searchParams.get("prefix") || "";
+      if (!BUCKETS.has(bucket)) return json({ error: "Invalid media category." }, 400, origin);
 
       const user = await authenticate(request, env);
       if (!user) return json({ error: "Sign in to upload or manage media." }, 401, origin);
+      if (url.pathname === "/list" && request.method === "GET") {
+        const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") || 100)));
+        if (prefix && (!safeKey(prefix) || !(prefix === user.id || prefix.startsWith(user.id + "/")))) return json({ error: "You can only list files in your own account folder." }, 403, origin);
+        if (!prefix && limit > 1) return json({ error: "Root listing is limited to a health-check request." }, 403, origin);
+        const result = await env.MEDIA.list({ prefix: objectKey(bucket, prefix), limit });
+        const data = result.objects.map(obj => ({
+          name: prefix ? obj.key.slice((objectKey(bucket, prefix) + "/").length) : obj.key.slice((bucket + "/").length),
+          id: obj.etag,
+          metadata: { size: obj.size, mimetype: obj.httpMetadata && obj.httpMetadata.contentType },
+          created_at: obj.uploaded ? obj.uploaded.toISOString() : null,
+          updated_at: obj.uploaded ? obj.uploaded.toISOString() : null
+        }));
+        return json({ data, error: null }, 200, origin);
+      }
+      if (!safeKey(key)) return json({ error: "Invalid object key." }, 400, origin);
       if (key.split("/")[0] !== user.id) return json({ error: "You can only manage files in your own account folder." }, 403, origin);
 
       if (request.method === "PUT" && url.pathname === "/upload") {
