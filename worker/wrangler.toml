@@ -1,4 +1,4 @@
-name = "blueprint-media-api"
+name = "blueprint"
 main = "src/index.js"
 compatibility_date = "2026-11-15"
 
