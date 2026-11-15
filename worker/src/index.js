@@ -95,7 +95,7 @@ export default {
         if (!obj) {
           // Keep pre-migration Supabase Storage objects readable until the owner migrates them to R2.
           const legacyPath = key.split("/").map(encodeURIComponent).join("/");
-          const legacyUrl = env.SUPABASE_URL.replace(/\\/$/, "") + "/storage/v1/object/public/" + encodeURIComponent(bucket) + "/" + legacyPath;
+          const legacyUrl = env.SUPABASE_URL.replace(/\/$/, "") + "/storage/v1/object/public/" + encodeURIComponent(bucket) + "/" + legacyPath;
           const legacyHeaders = new Headers();
           if (rangeHeader) legacyHeaders.set("Range", rangeHeader);
           const legacy = await fetch(legacyUrl, { method: request.method, headers: legacyHeaders });
