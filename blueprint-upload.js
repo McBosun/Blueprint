@@ -3,6 +3,7 @@ window.BPUpload = {
   // Upload a file or blob to Supabase Storage. Large files go in resumable 6 MB chunks.
   async put(bucket, path, blob, type, onProgress) {
     const C = window.BLUEPRINT_CONFIG, sb = window.BP.sb;
+    if (window.BPR2 && window.BPR2.enabled) { await window.BPR2.upload(bucket, path, blob, type, onProgress); return; }
     const s = (await sb.auth.getSession()).data.session;
     if (!s) throw new Error('Please sign in again.');
     if (!window.tus || blob.size < 6 * 1048576) {
