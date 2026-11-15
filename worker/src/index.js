@@ -100,7 +100,7 @@ export default {
         headers.set("Cache-Control", bucket === "avatars" ? "public, max-age=300" : "public, max-age=3600");
         const downloadName = url.searchParams.get("download");
         if (downloadName) {
-          const safeName = downloadName.replace(/[\\r\\n"\\\\]/g, "_").slice(0, 180);
+          const safeName = downloadName.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 180);
           headers.set("Content-Disposition", 'attachment; filename="' + safeName + '"');
         }
         if (rangeHeader && obj.range) {
