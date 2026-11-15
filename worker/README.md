@@ -5,12 +5,12 @@ This Worker is the media API for the Blueprint GitHub Pages frontend. Supabase r
 ## 1. Deploy the Worker from this repository
 
 In Cloudflare Dashboard:
-1. Open **Workers & Pages** and select the Worker you already created (name it `blueprint-media-api` if you have not named it yet).
+1. Open **Workers & Pages** and select the Worker you already created (keep the existing Worker name `blueprint`).
 2. Open **Settings → Builds** / **Builds** and connect the GitHub repository `McBosun/Blueprint`.
 3. Select branch `cloudflare-r2-integration` while testing.
 4. Set the Worker root directory to `worker`.
 5. Set the build command to blank / none and the deploy command to `npx wrangler deploy` if Cloudflare asks for one. The Wrangler config is `worker/wrangler.toml`.
-6. Deploy. The Worker URL will look like `https://blueprint-media-api.<your-subdomain>.workers.dev`.
+6. Deploy. The Worker URL will look like `https://blueprint.<your-subdomain>.workers.dev`.
 
 If the Worker was created with the dashboard editor, it is okay to connect the GitHub repository to that existing Worker. Do not create a second Worker unless Cloudflare requires it.
 
@@ -18,7 +18,7 @@ If the Worker was created with the dashboard editor, it is okay to connect the G
 
 Worker → **Settings → Bindings → Add binding → R2 bucket**:
 - Variable name: `MEDIA`
-- Bucket: `blueprint-media`
+- Bucket: `blueprint`
 
 The same binding is declared in `wrangler.toml`. Save and redeploy.
 
@@ -39,7 +39,7 @@ The Worker validates each Supabase access token by calling Supabase Auth's `/aut
 Open the existing private `config.js` in your repository (do not replace its current Supabase URL or key). Add one property inside `window.BLUEPRINT_CONFIG`:
 
 ```js
-mediaApi: 'https://blueprint-media-api.YOUR-SUBDOMAIN.workers.dev',
+mediaApi: 'https://blueprint.YOUR-SUBDOMAIN.workers.dev',
 ```
 
 Replace the example URL with the exact Worker URL shown by Cloudflare. Keep the existing `url`, `key`, and any other settings. Do not paste credentials into chat or commit service-role keys.
@@ -67,6 +67,6 @@ Supabase Auth and all database tables remain in place. Existing Supabase Storage
 6. Test a live replay if possible.
 7. Delete a test post and confirm its R2 objects are removed.
 8. Test playback on iPhone Safari and Android Chrome, including seeking in a video (HTTP byte ranges).
-9. Check Cloudflare Worker logs for errors and verify that objects appear in the `blueprint-media` bucket.
+9. Check Cloudflare Worker logs for errors and verify that objects appear in the `blueprint` bucket.
 
 Do not delete existing Supabase Storage objects. This branch is a staging integration; merge only after these tests pass.
