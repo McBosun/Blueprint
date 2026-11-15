@@ -1,7 +1,7 @@
 // Paste your values from Supabase: Project Settings > API.
 // The publishable (anon) key is safe in the app. NEVER put the service_role key here.
 window.BLUEPRINT_CONFIG = {
-  mediaApi: 'https://blueprint.olatunbosunabi4-efc.workers.dev',
+  mediaApi: 'https://blueprint-media-api.olatunbosunabi4-efc.workers.dev',
   url: 'https://zhlrrjuncycguvqzejuz.supabase.co',
   key: 'sb_publishable_Ue56aN_hm6XA5EJQ7EPUdw_gI7nx9AQ',
   jamendoId: '4ef0cbeb',
