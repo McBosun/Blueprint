@@ -41,6 +41,16 @@ async function authenticate(request, env) {
   const user = await r.json();
   return user && user.id ? user : null;
 }
+async function isAdmin(request, env) {
+  const authorization = request.headers.get("Authorization") || "";
+  const r = await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/rpc/bp_is_admin", {
+    method: "POST",
+    headers: { Authorization: authorization, apikey: env.SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+    body: "{}"
+  });
+  if (!r.ok) return false;
+  return (await r.json()) === true;
+}
 function parseRange(value, size) {
   const m = /^bytes=(\d*)-(\d*)$/.exec(value || "");
   if (!m) return null;
@@ -123,7 +133,11 @@ export default {
         return json({ data, error: null }, 200, origin);
       }
       if (!safeKey(key)) return json({ error: "Invalid object key." }, 400, origin);
-      if (key.split("/")[0] !== user.id) return json({ error: "You can only manage files in your own account folder." }, 403, origin);
+      if (key.split("/")[0] !== user.id) {
+        const adminDelete = request.method === "DELETE" && url.pathname === "/object" &&
+          ["videos", "media", "avatars"].includes(bucket) && await isAdmin(request, env);
+        if (!adminDelete) return json({ error: "You can only manage files in your own account folder." }, 403, origin);
+      }
 
       if (request.method === "PUT" && url.pathname === "/upload") {
         const type = request.headers.get("Content-Type") || "application/octet-stream";
