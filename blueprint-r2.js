@@ -1,7 +1,7 @@
 // Cloudflare R2 adapter for Blueprint. Supabase remains the identity and database provider.
 (() => {
   const C = window.BLUEPRINT_CONFIG || {};
-  const base = String(C.mediaApi || "").replace(/\/$/, "");
+  const base = String(C.mediaApi || window.BLUEPRINT_MEDIA_API || "").replace(/\/$/, "");
   if (!base) return; // Keep the existing Supabase Storage behavior until the Worker URL is configured.
 
   const allowed = new Set(["videos", "media", "avatars", "sounds", "ads"]);
