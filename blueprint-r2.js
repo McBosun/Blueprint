@@ -81,7 +81,17 @@
           try { return await remove(bucket, paths); }
           catch (error) { return { data: null, error }; }
         },
-        getPublicUrl: path => ({ data: { publicUrl: url(bucket, path) } })
+        getPublicUrl: (path, options = {}) => ({ data: { publicUrl: url(bucket, path) + (options.download ? "?download=" + encodeURIComponent(options.download === true ? path.split("/").pop() : options.download) : "") } }),
+        list: async (prefix = "", options = {}) => {
+          try {
+            const access = await token();
+            const q = new URLSearchParams({ bucket, prefix, limit: String(options.limit || 100) });
+            const r = await fetch(base + "/list?" + q.toString(), { headers: { Authorization: "Bearer " + access } });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(body.error || "Could not list media.");
+            return { data: body.data || [], error: null };
+          } catch (error) { return { data: null, error }; }
+        }
       };
     };
   };
